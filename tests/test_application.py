@@ -65,3 +65,26 @@ async def test_nominal_flow_is_fully_audited_in_step_order():
     assert events[-1].outcome == "PENDING_HUMAN"
     assert "plafond par commande 500,00 €" in events[-1].explanation
     assert order.mandate_version == 1 and order.decided_at == DEMO_NOW
+
+
+async def test_search_applies_hard_constraints_before_truncation_and_usual_products_first():
+    from ttap.adapters.outbound.catalog_json import JsonCatalog
+    from ttap.application.lookup import LookupService
+    from ttap.domain.models import Delivery, Need, Quantity, RequestLine, Unit
+    from tests.factories import MONDAY, price, product, stock
+    from tests.fakes import FakeGateway
+    env = Env()
+    noise = [product(f"N{i:03d}", f"Milk chocolate {i}") for i in range(300)]        # no lactose-free claim
+    others = [product(f"O{i}", "Milk drink 1 l", claims=("FREE_FROM_LACTOSE",)) for i in range(3)]
+    usual = product("ZZZ", "Milk 1 l", claims=("FREE_FROM_LACTOSE",))                # sorts last by id
+    catalog = JsonCatalog(noise + others + [usual], "v")
+    gw = FakeGateway({p.product_id: price(p.product_id, "1.50" if p.product_id != "ZZZ" else "1.01", "1.50"
+                      if p.product_id != "ZZZ" else "1.01") for p in others + [usual]},
+                     {p.product_id: stock(p.product_id, "9999999999") for p in others + [usual]})
+    svc = LookupService(catalog, gw, env.signer, env.clock, env.store, env.new_id, env.auditor, search_limit=2,
+                        usual=lambda org: {"ZZZ"})
+    req = env.requests.create("org_a", [RequestLine(line_id="L1", need=Need(text="milk", required_claims=["FREE_FROM_LACTOSE"]),
+                              quantity=Quantity(value=Decimal("10"), unit=Unit.L))],
+                              Delivery(requested_date=MONDAY, latest_acceptable_date=MONDAY))
+    offer = await svc.lookup("org_a", req.request_id)
+    assert offer.lines[0].tiers["good"].product_id == "ZZZ"

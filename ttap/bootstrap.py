@@ -59,6 +59,11 @@ def demo_mandates() -> InMemoryMandates:
     })
 
 
+def _usual_ids(mandates: MandateRepository, org_id: str) -> set[str]:
+    mandate = mandates.get(org_id)
+    return {u.product_id for u in mandate.usual_list} if mandate else set()
+
+
 def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: Clock,
                    store: Store | None = None, signer: Signer | None = None,
                    mandates: MandateRepository | None = None, audit: AuditLog | None = None,
@@ -70,7 +75,8 @@ def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: 
     policy = CedarPolicyEngine.from_file(POLICIES)
     return Services(
         requests=RequestService(store, new_id, auditor),
-        lookup=LookupService(catalog, gateway, signer, clock, store, new_id, auditor, simulated=simulated),
+        lookup=LookupService(catalog, gateway, signer, clock, store, new_id, auditor, simulated=simulated,
+                             usual=lambda org: _usual_ids(mandates, org)),
         orders=OrderService(store, signer, policy, mandates, clock, new_id, auditor),
         signer=signer,
         approvals=ApprovalService(store, policy, mandates, clock, auditor, notifier or LoggingNotifier()),

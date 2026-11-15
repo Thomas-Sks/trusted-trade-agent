@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from ttap.application.auditing import Auditor
 from ttap.application.errors import NotFound, UpstreamError
+from ttap.domain.assurance import need_violation
 from ttap.domain.errors import UpstreamUnavailable
 from ttap.domain.models import CatalogProduct, Offer, RequestLine
 from ttap.domain.explain import explain_offer
@@ -16,29 +17,34 @@ from ttap.ports import CatalogRepository, Clock, Signer, Store, SupplierGateway
 class LookupService:
     def __init__(self, catalog: CatalogRepository, gateway: SupplierGateway, signer: Signer, clock: Clock,
                  store: Store, new_id: Callable[[str], str], auditor: Auditor,
-                 offer_ttl: timedelta = timedelta(minutes=30), search_limit: int = 60,
-                 simulated: Callable[[], list[str]] = lambda: []):
+                 offer_ttl: timedelta = timedelta(minutes=30), search_limit: int = 200,
+                 simulated: Callable[[], list[str]] = lambda: [], usual: Callable[[str], set[str]] = lambda org: set()):
         self._catalog, self._gateway, self._signer = catalog, gateway, signer
         self._clock, self._store, self._new_id = clock, store, new_id
         self._ttl, self._limit = offer_ttl, search_limit
         self._auditor = auditor
         self._simulated = simulated
+        self._usual = usual
 
-    def _candidates(self, line: RequestLine) -> tuple[list[CatalogProduct], CatalogProduct | None]:
-        """Explicit product -> itself + its official substitutes; otherwise a catalogue search."""
+    def _candidates(self, line: RequestLine, usual: set[str] = frozenset()) -> tuple[list[CatalogProduct], CatalogProduct | None]:
+        """Explicit product -> itself + its official substitutes. Otherwise a catalogue search where hard constraints
+        are applied BEFORE truncation and the buyer's usual products come first (order-guide prior)."""
         if line.need.product_id:
             requested = self._catalog.get(line.need.product_id)
             if requested is None:
                 return [], None
             subs = [self._catalog.get(s) for s in requested.substitutes]
             return [requested, *[p for p in subs if p is not None]], requested
-        return self._catalog.search(line.need.text, limit=self._limit), None
+        matches = [p for p in self._catalog.search(line.need.text, limit=100_000) if need_violation(p, line.need) is None]
+        matches.sort(key=lambda p: p.product_id not in usual)  # stable: keeps search relevance within each group
+        return matches[: self._limit], None
 
     async def lookup(self, org_id: str, request_id: str) -> Offer:
         req = self._store.get_request(org_id, request_id)
         if req is None:
             raise NotFound(f"request {request_id}")
-        per_line = {line.line_id: self._candidates(line) for line in req.lines}
+        usual = self._usual(org_id)
+        per_line = {line.line_id: self._candidates(line, usual) for line in req.lines}
         ids = [p.product_id for products, _ in per_line.values() for p in products]
         try:
             prices = await self._gateway.prices(ids, req.delivery.requested_date) if ids else {}

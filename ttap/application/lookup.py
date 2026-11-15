@@ -16,11 +16,13 @@ from ttap.ports import CatalogRepository, Clock, Signer, Store, SupplierGateway
 class LookupService:
     def __init__(self, catalog: CatalogRepository, gateway: SupplierGateway, signer: Signer, clock: Clock,
                  store: Store, new_id: Callable[[str], str], auditor: Auditor,
-                 offer_ttl: timedelta = timedelta(minutes=30), search_limit: int = 60):
+                 offer_ttl: timedelta = timedelta(minutes=30), search_limit: int = 60,
+                 simulated: Callable[[], list[str]] = lambda: []):
         self._catalog, self._gateway, self._signer = catalog, gateway, signer
         self._clock, self._store, self._new_id = clock, store, new_id
         self._ttl, self._limit = offer_ttl, search_limit
         self._auditor = auditor
+        self._simulated = simulated
 
     def _candidates(self, line: RequestLine) -> tuple[list[CatalogProduct], CatalogProduct | None]:
         """Explicit product -> itself + its official substitutes; otherwise a catalogue search."""
@@ -52,7 +54,7 @@ class LookupService:
                                   requested=per_line[line.line_id][1]) for line in req.lines]
         offer = Offer(offer_id=self._new_id("of"), request_id=req.request_id, org_id=org_id, issued_at=now,
                       valid_until=offer_valid_until(now, self._ttl, lines),
-                      catalog_version=self._catalog.version, lines=lines)
+                      catalog_version=self._catalog.version, lines=lines, simulated=self._simulated())
         offer.signature = self._signer.sign(offer_payload(offer))
         self._store.save_offer(offer)
         self._auditor.record(
@@ -60,6 +62,7 @@ class LookupService:
             actor="system", outcome="success", explanation=explain_offer(offer),
             data={"offer_id": offer.offer_id, "offer_hash": offer_hash(offer),
                   "valid_until": offer.valid_until.isoformat(), "catalog_version": offer.catalog_version,
+                  "simulated": offer.simulated,
                   "lines": [{"line_id": ln.line_id, "tiers": {t: c.product_id for t, c in ln.tiers.items()},
                              "split": [[c.product_id, str(c.qty_sales_units)] for c in ln.split],
                              "backorder_qty": str(ln.backorder_qty),

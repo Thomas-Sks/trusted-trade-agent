@@ -14,6 +14,7 @@ RULE_TEXT: dict[str, str] = {
     "period_budget_exceeded": "Budget de la période dépassé : {period_spend_net} € engagés > {period_budget_net} €",
     "order_velocity_exceeded": (
         "Rythme anormal : {orders_last_hour} commandes dans l'heure > {max_orders_per_hour} (fractionnement ?)"),
+    "stale_data": "Données fournisseur périmées (servies depuis le cache pendant une panne)",
     "mandate_not_active": "Mandat inactif, suspendu ou expiré",
     "policy_evaluation_error": "Erreur d'évaluation des règles : refus par défaut",
 }

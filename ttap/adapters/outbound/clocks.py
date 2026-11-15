@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 
 class SystemClock:
@@ -22,6 +22,11 @@ class ShiftedClock:
     def __init__(self, start: datetime):
         self._start = start
         self._boot = datetime.now(UTC)
+        self._offset = timedelta(0)
+
+    def advance(self, minutes: float) -> datetime:
+        self._offset += timedelta(minutes=minutes)
+        return self.now()
 
     def now(self) -> datetime:
-        return self._start + (datetime.now(UTC) - self._boot)
+        return self._start + (datetime.now(UTC) - self._boot) + self._offset

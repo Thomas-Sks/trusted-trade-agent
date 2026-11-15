@@ -109,6 +109,7 @@ class UpstreamPrice(BaseModel):
     list_net: Decimal | None = None
     valid_to: datetime | None = None
     net_price_found: bool = False
+    stale: bool = False
 
 
 class UpstreamAvailability(BaseModel):
@@ -120,6 +121,7 @@ class UpstreamAvailability(BaseModel):
     sales_unit: str | None = None
     closing_time: datetime | None = None
     reserved: Decimal = Decimal("0")  # already promised by this gateway (available_amount is net of it)
+    stale: bool = False
 
 
 Tier = Literal["good", "better", "best", "split"]
@@ -153,6 +155,7 @@ class Candidate(BaseModel):
     missing_qty: Decimal = Decimal("0")
     lot_size: Decimal = Decimal("1")
     upstream_available: Decimal | None = None
+    stale: bool = False
 
 
 class Exclusion(BaseModel):
@@ -177,6 +180,7 @@ class Offer(BaseModel):
     valid_until: datetime
     catalog_version: str
     lines: list[OfferLine]
+    simulated: list[str] = []
     signature: str | None = None
 
 

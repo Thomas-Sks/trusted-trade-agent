@@ -95,6 +95,7 @@ def evaluate_candidate(p: CatalogProduct, line: RequestLine, price: UpstreamPric
         reliability=p.reliability, carbon_kg_per_kg=p.carbon_kg_per_kg, is_substitute=is_substitute,
         partial=partial, missing_qty=missing, lot_size=p.lot_size,
         upstream_available=(av.available_amount + av.reserved) if av.available_amount is not None else None,
+        stale=av.stale or price.stale,
     )
 
 

@@ -43,6 +43,10 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
     for c in cands:
         if c.origin == OriginAssurance.CONFLICT:
             warnings.append(f"origine contradictoire ({'/'.join(c.origins)}) : {c.name}")
+    if offer.simulated:
+        warnings.append("scénario SIMULÉ actif : " + ", ".join(offer.simulated))
+    if any(c.stale for c in cands):
+        warnings.append("données fournisseur périmées (panne amont)")
     lines_by_id = {line.line_id: line for line in offer.lines}
     for sel in order.selected:
         line = lines_by_id[sel.line_id]

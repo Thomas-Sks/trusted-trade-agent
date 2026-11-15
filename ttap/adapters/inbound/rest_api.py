@@ -30,6 +30,14 @@ PROTOCOL_VERSION = "2026-11-15"
 
 
 @dataclass
+class DemoControls:
+    """Seller-admin demo levers. Everything they change is flagged SIMULATED in offers and audit."""
+    scenario: object  # ScenarioGateway
+    cache: object | None  # CachingGateway
+    clock: object  # ShiftedClock
+
+
+@dataclass
 class Services:
     requests: RequestService
     lookup: LookupService
@@ -37,6 +45,11 @@ class Services:
     signer: Signer
     approvals: ApprovalService
     auditor: Auditor
+    demo: DemoControls | None = None
+
+
+class ClockAdvance(BaseModel):
+    minutes: float
 
 
 class Lifecycle(Protocol):
@@ -75,7 +88,8 @@ class Unauthorized(TTAPError):
 
 def create_app(services: Services, agent_keys: dict[str, str],
                approver_keys: dict[str, tuple[str, str]] | None = None,
-               lifecycle: Lifecycle | None = None, expiry_interval_s: float = 30.0) -> FastAPI:
+               lifecycle: Lifecycle | None = None, expiry_interval_s: float = 30.0,
+               admin_key: str | None = None) -> FastAPI:
     approver_keys = approver_keys or {}
 
     async def _expiry_loop() -> None:
@@ -128,6 +142,30 @@ def create_app(services: Services, agent_keys: dict[str, str],
         if token in approver_keys:
             return approver_keys[token][0]
         raise Unauthorized("unknown key")
+
+    def admin(authorization: str = Header()) -> str:
+        if not admin_key or _token(authorization) != admin_key or services.demo is None:
+            raise Unauthorized("admin key required")
+        return "seller_admin"
+
+    @app.put("/admin/scenario")
+    def set_scenario(body: dict, _: str = Depends(admin)) -> dict:
+        from ttap.adapters.outbound.scenario_gateway import Scenario
+        services.demo.scenario.set(Scenario.model_validate(body))
+        if services.demo.cache:
+            services.demo.cache.clear()
+        return {"active": services.demo.scenario.scenario.active()}
+
+    @app.delete("/admin/scenario")
+    def clear_scenario(_: str = Depends(admin)) -> dict:
+        services.demo.scenario.clear()
+        if services.demo.cache:
+            services.demo.cache.clear()
+        return {"active": []}
+
+    @app.post("/admin/clock/advance")
+    def advance_clock(body: ClockAdvance, _: str = Depends(admin)) -> dict:
+        return {"now": services.demo.clock.advance(body.minutes).isoformat()}
 
     @app.post("/requests", status_code=201, response_model=PurchaseRequest)
     def create_request(body: CreateRequestBody, org: str = Depends(org_id)) -> PurchaseRequest:

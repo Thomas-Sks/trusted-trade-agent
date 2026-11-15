@@ -25,6 +25,7 @@ def build_decision_context(candidates: list[Candidate], mandate: Mandate | None,
         "has_origin_conflict": any(c.origin == OriginAssurance.CONFLICT for c in candidates),
         "has_changes_vs_request": any(c.changes_vs_request for c in candidates),
         "has_partial": any(c.partial for c in candidates),
+        "data_stale": any(c.stale for c in candidates),
         "period_spend_net": committed_spend + total,
         "period_budget_net": (mandate.period_budget_net if mandate and mandate.period_budget_net is not None
                               else UNLIMITED_MONEY),

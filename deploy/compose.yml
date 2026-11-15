@@ -1,0 +1,45 @@
+# Production stack for a single VM: only Caddy is published; gateway and agent stay on the internal network.
+services:
+  gateway:
+    build: ..
+    env_file: ../.env
+    environment:
+      CATALOG_PATH: resources/valio_aimo_junction26_product_data.json
+    volumes:
+      - ../resources:/app/resources:ro
+      - ttap-data:/data
+    restart: unless-stopped
+  agent:
+    build: ..
+    command: ["uv", "run", "--no-dev", "uvicorn", "buyer_agent.agent_server:app", "--host", "0.0.0.0", "--port", "8820"]
+    env_file: ../.env
+    environment:
+      TTAP_URL: http://gateway:8811
+    depends_on: [gateway]
+    restart: unless-stopped
+  web:
+    build:
+      context: ../web
+      args:
+        NEXT_PUBLIC_TELEGRAM_BOT: ${TELEGRAM_BOT_USERNAME:-}
+    env_file: ../.env
+    environment:
+      GATEWAY_URL: http://gateway:8811
+      AGENT_URL: http://agent:8820
+    depends_on: [gateway, agent]
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_HOST: ${SITE_HOST}
+      BASIC_USER: ${BASIC_USER}
+      BASIC_HASH: ${BASIC_HASH}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [web]
+    restart: unless-stopped
+volumes:
+  ttap-data:
+  caddy-data:

@@ -3,6 +3,8 @@ WORKDIR /web
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
+ARG NEXT_PUBLIC_TELEGRAM_BOT
+ENV NEXT_PUBLIC_TELEGRAM_BOT=$NEXT_PUBLIC_TELEGRAM_BOT
 RUN npx next build
 
 FROM node:24-alpine

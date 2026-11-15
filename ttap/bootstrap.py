@@ -25,6 +25,7 @@ from ttap.application.approvals import ApprovalService
 from ttap.application.interpret import InterpretService
 from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
+from ttap.application.mandates import MandateService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
 from ttap.domain.models import Mandate, UsualItem
@@ -82,6 +83,7 @@ def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: 
         approvals=ApprovalService(store, policy, mandates, clock, auditor, notifier or LoggingNotifier()),
         auditor=auditor,
         interpret=InterpretService(interpreter, catalog, mandates, clock, auditor),
+        mandates=MandateService(mandates, policy, auditor),
     )
 
 

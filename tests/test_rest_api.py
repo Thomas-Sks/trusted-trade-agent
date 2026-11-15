@@ -18,8 +18,10 @@ APPROVER = {"Authorization": "Bearer appr-a"}
 def client(limit: str = "2000") -> TestClient:
     env = Env(limit=limit)
     approvals = ApprovalService(env.store, env.policy, env.mandates, env.clock, env.auditor, LoggingNotifier())
+    from ttap.application.mandates import MandateService
     services = Services(requests=env.requests, lookup=env.lookup, orders=env.orders, signer=env.signer,
-                        approvals=approvals, auditor=env.auditor)
+                        approvals=approvals, auditor=env.auditor,
+                        mandates=MandateService(env.mandates, env.policy, env.auditor))
     return TestClient(create_app(services, {"key-a": "org_a", "key-b": "org_b"}, {"appr-a": ("org_a", "alice")}))
 
 

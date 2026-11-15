@@ -17,6 +17,7 @@ from ttap.application.auditing import Auditor
 from ttap.application.errors import TTAPError
 from ttap.application.interpret import InterpretService
 from ttap.application.lookup import LookupService
+from ttap.application.mandates import MandateChanges, MandateService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
 from ttap.domain.audit_verify import verify_chain
@@ -49,6 +50,7 @@ class Services:
     auditor: Auditor
     demo: DemoControls | None = None
     interpret: InterpretService | None = None
+    mandates: MandateService | None = None
 
 
 class InterpretBody(BaseModel):
@@ -244,6 +246,15 @@ def create_app(services: Services, agent_keys: dict[str, str],
         if order.state == OrderState.PENDING_HUMAN:
             await services.approvals.escalate(order)
         return order
+
+    @app.get("/mandate")
+    def get_mandate(who: tuple[str, str] = Depends(approver)) -> dict:
+        return services.mandates.get(who[0]).model_dump(mode="json")
+
+    @app.post("/mandate/simulate")
+    def simulate_mandate(body: MandateChanges, who: tuple[str, str] = Depends(approver)) -> dict:
+        """What-if: replay this organisation's recorded decisions with modified mandate parameters (read-only)."""
+        return services.mandates.simulate(who[0], body).model_dump(mode="json")
 
     @app.get("/audit", response_model=list[AuditEvent])
     def audit(org: str = Depends(any_org)) -> list[AuditEvent]:

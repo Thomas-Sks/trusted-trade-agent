@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Approvals } from "@/components/Approvals";
 import { AuditLog } from "@/components/AuditLog";
 import { DemoMenu } from "@/components/DemoMenu";
+import { Mandate } from "@/components/Mandate";
 import { NewRequest } from "@/components/NewRequest";
 import { Requests } from "@/components/Requests";
 import { ORGS, type Org } from "@/lib/api";
@@ -11,6 +12,7 @@ const TABS = [
   { key: "new", label: "New request" },
   { key: "requests", label: "Orders" },
   { key: "approvals", label: "Approvals" },
+  { key: "mandate", label: "Mandate" },
   { key: "audit", label: "Audit log" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -57,6 +59,7 @@ export default function Home() {
         <div className={tab === "new" ? "" : "hidden"}><NewRequest org={org} /></div>
         {tab === "requests" && <Requests org={org} />}
         <div className={tab === "approvals" ? "" : "hidden"}><Approvals org={org} onCount={onCount} /></div>
+        {tab === "mandate" && <Mandate org={org} />}
         {tab === "audit" && <AuditLog org={org} />}
       </main>
     </div>

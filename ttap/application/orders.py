@@ -11,6 +11,7 @@ from ttap.application.errors import (
 from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
 from ttap.domain.models import Candidate, Offer, Order, OrderState, SelectedLine
+from ttap.domain.order_response import build_order_response
 from ttap.domain.offer import offer_hash, offer_payload, price_lock_until, resolve_selection
 from ttap.ports import Clock, MandateRepository, PolicyEngine, Signer, Store
 
@@ -79,10 +80,12 @@ class OrderService:
                                            "lock_until": price_lock_until(
                                                now, mandate.approval_timeout if mandate else timedelta(0), candidates),
                                            "mandate_version": mandate.version if mandate else None})
+        decided = decided.model_copy(update={"order_response": build_order_response(decided, offer)})
         self._store.transition(org_id, order.order_id, OrderState.PENDING_DECISION, 1, decided)
         self._auditor.record(
             org_id=org_id, step="approval", action="decided", subject=f"order/{order.order_id}",
             actor="policy:cedar", outcome=decision.outcome, explanation=explain_decision(decided),
             data={"rules_fired": decision.rules_fired, "context": decided.model_dump(mode="json")["decision"]["context"],
-                  "mandate_version": decided.mandate_version})
+                  "mandate_version": decided.mandate_version,
+                  "order_response": decided.order_response.model_dump(mode="json")})
         return decided

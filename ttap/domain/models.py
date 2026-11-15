@@ -201,6 +201,22 @@ class Decision(BaseModel):
     context: dict[str, Any]
 
 
+class OrderResponseLine(BaseModel):
+    line_id: str
+    status: Literal[1, 3, 5, 7]
+    product_id: str | None
+    quantity: Decimal
+    sales_unit: str
+    substituted_for: str | None = None
+    backorder_qty: Decimal = Decimal("0")
+    reason: str | None = None
+
+
+class OrderResponse(BaseModel):
+    code: Literal["AB", "AP", "CA", "RE"]
+    lines: list[OrderResponseLine] = []
+
+
 class Order(BaseModel):
     order_id: str
     org_id: str
@@ -217,6 +233,7 @@ class Order(BaseModel):
     mandate_version: int | None = None
     approved_by: str | None = None
     rejection_reason: str | None = None
+    order_response: OrderResponse | None = None
 
 
 class UsualItem(BaseModel):

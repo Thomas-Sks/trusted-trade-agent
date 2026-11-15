@@ -7,6 +7,7 @@ from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
 from ttap.domain.models import ApprovalCard, Offer, Order, OrderState, SelectedLine
 from ttap.domain.offer import resolve_selection
+from ttap.domain.order_response import build_order_response
 from ttap.ports import Clock, MandateRepository, Notifier, PolicyEngine, Store
 
 MODIFY_OUTCOME = {"AUTO_APPROVED": OrderState.APPROVED, "PENDING_HUMAN": OrderState.PENDING_HUMAN,
@@ -42,6 +43,7 @@ class ApprovalService:
             raise PriceLockExpired(f"price lock ended at {order.lock_until.isoformat()}")
 
     def _commit(self, before: Order, after: Order) -> Order:
+        after = after.model_copy(update={"order_response": build_order_response(after, self._offer(after))})
         if not self._store.transition(before.org_id, before.order_id, before.state, before.version, after):
             raise Conflict(f"order {before.order_id} changed concurrently")
         return after
@@ -117,6 +119,7 @@ class ApprovalService:
             if order.lock_until is None or now < order.lock_until:
                 continue
             after = order.model_copy(update={"state": OrderState.EXPIRED, "version": order.version + 1})
+            after = after.model_copy(update={"order_response": build_order_response(after, self._offer(after))})
             if self._store.transition(order.org_id, order.order_id, order.state, order.version, after):
                 self._auditor.record(
                     org_id=order.org_id, step="approval", action="expired", subject=f"order/{order.order_id}",

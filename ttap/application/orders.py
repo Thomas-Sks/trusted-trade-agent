@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 from decimal import Decimal
 
 from ttap.application.auditing import Auditor
@@ -10,7 +11,7 @@ from ttap.application.errors import (
 from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
 from ttap.domain.models import Candidate, Offer, Order, OrderState, SelectedLine
-from ttap.domain.offer import offer_hash, offer_payload
+from ttap.domain.offer import offer_hash, offer_payload, price_lock_until, resolve_selection
 from ttap.ports import Clock, MandateRepository, PolicyEngine, Signer, Store
 
 OUTCOME_TO_STATE = {"AUTO_APPROVED": OrderState.AUTO_APPROVED, "PENDING_HUMAN": OrderState.PENDING_HUMAN,
@@ -37,14 +38,10 @@ class OrderService:
 
     @staticmethod
     def _resolve(offer: Offer, selected: list[SelectedLine]) -> list[Candidate]:
-        lines = {line.line_id: line for line in offer.lines}
-        out = []
-        for sel in selected:
-            line = lines.get(sel.line_id)
-            if line is None or sel.tier not in line.tiers:
-                raise InvalidSelection(f"{sel.line_id}/{sel.tier}")
-            out.append(line.tiers[sel.tier])
-        return out
+        try:
+            return resolve_selection(offer, selected)
+        except KeyError as exc:
+            raise InvalidSelection(f"unknown line or tier: {exc}") from exc
 
     def place(self, org_id: str, offer_id: str, selected: list[SelectedLine], idempotency_key: str) -> Order:
         existing = self._store.get_order_by_idempotency_key(org_id, idempotency_key)
@@ -79,6 +76,8 @@ class OrderService:
         decision = self._policy.decide(build_decision_context(candidates, mandate, now))
         decided = order.model_copy(update={"state": OUTCOME_TO_STATE[decision.outcome], "version": 2,
                                            "decision": decision, "decided_at": now,
+                                           "lock_until": price_lock_until(
+                                               now, mandate.approval_timeout if mandate else timedelta(0), candidates),
                                            "mandate_version": mandate.version if mandate else None})
         self._store.transition(org_id, order.order_id, OrderState.PENDING_DECISION, 1, decided)
         self._auditor.record(

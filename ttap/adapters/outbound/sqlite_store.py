@@ -69,6 +69,11 @@ class SqliteStore:
         row = self._one("SELECT body FROM orders WHERE org_id = ? AND idempotency_key = ?", (org_id, key))
         return Order.model_validate_json(row[0]) if row else None
 
+    def list_orders_by_state(self, state: OrderState) -> list[Order]:
+        with self._lock:
+            rows = self._db.execute("SELECT body FROM orders WHERE state = ?", (state.value,)).fetchall()
+        return [Order.model_validate_json(r[0]) for r in rows]
+
     def transition(self, org_id: str, order_id: str, expected_state: OrderState, expected_version: int,
                    updated: Order) -> bool:
         if updated.version != expected_version + 1:

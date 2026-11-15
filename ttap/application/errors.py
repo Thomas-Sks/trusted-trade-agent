@@ -29,3 +29,11 @@ class IdempotencyMismatch(TTAPError):
 
 class UpstreamError(TTAPError):
     code, status = "UPSTREAM_UNAVAILABLE", 503
+
+
+class Conflict(TTAPError):
+    code, status = "CONFLICT", 409
+
+
+class PriceLockExpired(TTAPError):
+    code, status = "PRICE_LOCK_EXPIRED", 409

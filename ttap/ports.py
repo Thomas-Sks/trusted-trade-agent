@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from ttap.domain.models import (
-    CatalogProduct, Decision, Mandate, Offer, Order, OrderState, PurchaseRequest, UpstreamAvailability, UpstreamPrice,
+    ApprovalCard, CatalogProduct, Decision, Mandate, Offer, Order, OrderState, PurchaseRequest, UpstreamAvailability, UpstreamPrice,
 )
 
 
@@ -47,5 +47,10 @@ class Store(Protocol):
     def insert_order(self, order: Order) -> bool: ...
     def get_order(self, org_id: str, order_id: str) -> Order | None: ...
     def get_order_by_idempotency_key(self, org_id: str, key: str) -> Order | None: ...
+    def list_orders_by_state(self, state: OrderState) -> list[Order]: ...
     def transition(self, org_id: str, order_id: str, expected_state: OrderState, expected_version: int,
                    updated: Order) -> bool: ...
+
+
+class Notifier(Protocol):
+    async def request_approval(self, order: Order, card: ApprovalCard) -> None: ...

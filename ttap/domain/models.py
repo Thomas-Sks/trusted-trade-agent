@@ -203,6 +203,7 @@ class Order(BaseModel):
     decision: Decision | None = None
     idempotency_key: str
     decided_at: datetime | None = None
+    lock_until: datetime | None = None
     mandate_version: int | None = None
     approved_by: str | None = None
     rejection_reason: str | None = None

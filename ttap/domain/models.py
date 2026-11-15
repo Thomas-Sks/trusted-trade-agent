@@ -1,0 +1,213 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Unit(StrEnum):
+    L = "L"
+    KG = "KG"
+    PIECE = "PIECE"
+
+
+class Quantity(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: Decimal = Field(gt=0)
+    unit: Unit
+
+
+class Need(BaseModel):
+    text: str
+    required_claims: list[str] = []
+    excluded_allergens: list[str] = []
+    required_labels: list[str] = []
+    product_id: str | None = None
+
+
+class Preferences(BaseModel):
+    origin: list[str] = []
+    brands: list[str] = []
+    labels: list[str] = []
+
+
+SubstitutionPref = Literal["best_match", "no_substitute"]
+
+
+class RequestLine(BaseModel):
+    line_id: str
+    need: Need
+    quantity: Quantity
+    preferences: Preferences = Preferences()
+    substitution: SubstitutionPref = "best_match"
+
+
+class Delivery(BaseModel):
+    requested_date: date
+    latest_acceptable_date: date
+
+
+class PurchaseRequest(BaseModel):
+    request_id: str
+    org_id: str
+    lines: list[RequestLine] = Field(min_length=1)
+    delivery: Delivery
+
+
+class CatalogProduct(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    product_id: str
+    gtin: str | None
+    names: dict[str, str]
+    category: str
+    vendor: str
+    brand: str | None
+    sales_unit: str
+    base_unit: str
+    units: dict[str, Decimal]
+    lot_size: Decimal
+    claims: frozenset[str]
+    labels: frozenset[str]
+    allergens_contained: frozenset[str]
+    has_classification_data: bool
+    origin_valio: str | None
+    origin_manufacturer: tuple[str, ...]
+    substitutes: tuple[str, ...]
+    variable_weight: bool
+
+    def display_name(self, lang: str = "en") -> str:
+        return self.names.get(lang) or next(iter(self.names.values()), self.product_id)
+
+
+class StockStatus(StrEnum):
+    VERIFIED_QTY = "VERIFIED_QTY"
+    VERIFIED_UNLIMITED = "VERIFIED_UNLIMITED"
+    UNKNOWN_SUPPLIER_STOCK = "UNKNOWN_SUPPLIER_STOCK"
+    UNAVAILABLE = "UNAVAILABLE"
+    STALE = "STALE"
+
+
+class OriginAssurance(StrEnum):
+    CONSISTENT = "CONSISTENT"
+    CONFLICT = "CONFLICT"
+    SINGLE_SOURCE = "SINGLE_SOURCE"
+    MISSING = "MISSING"
+
+
+class UpstreamPrice(BaseModel):
+    product_id: str
+    error: bool
+    unit_net: Decimal | None = None
+    vat_rate: Decimal | None = None
+    comparison_net: Decimal | None = None
+    comparison_unit: str | None = None
+    list_net: Decimal | None = None
+    valid_to: datetime | None = None
+    net_price_found: bool = False
+
+
+class UpstreamAvailability(BaseModel):
+    product_id: str
+    sales_block: bool
+    logistic_model: str | None = None
+    available_amount: Decimal | None = None
+    available_date: date | None = None
+    sales_unit: str | None = None
+    closing_time: datetime | None = None
+
+
+Tier = Literal["good", "better", "best"]
+
+
+class Candidate(BaseModel):
+    product_id: str
+    name: str
+    qty_sales_units: Decimal
+    sales_unit: str
+    content_per_sales_unit: Decimal
+    content_source: Literal["name", "price_ratio"]
+    surplus: Decimal
+    unit_net: Decimal
+    line_total_net: Decimal
+    vat_rate: Decimal
+    comparison_net: Decimal
+    price_valid_to: datetime | None
+    stock: StockStatus
+    available_amount: Decimal | None
+    delivery_date: date
+    order_cutoff: datetime | None
+    origin: OriginAssurance
+    origins: list[str]
+    changes_vs_request: list[str]
+    score: float
+
+
+class Exclusion(BaseModel):
+    product_id: str
+    reason: str
+
+
+class OfferLine(BaseModel):
+    line_id: str
+    tiers: dict[str, Candidate]
+    excluded: list[Exclusion]
+    exceptions: list[str]
+
+
+class Offer(BaseModel):
+    offer_id: str
+    request_id: str
+    org_id: str
+    issued_at: datetime
+    valid_until: datetime
+    catalog_version: str
+    lines: list[OfferLine]
+    signature: str | None = None
+
+
+class OrderState(StrEnum):
+    PENDING_DECISION = "PENDING_DECISION"
+    AUTO_APPROVED = "AUTO_APPROVED"
+    PENDING_HUMAN = "PENDING_HUMAN"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    DENIED = "DENIED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+    CONFIRMED = "CONFIRMED"
+
+
+class SelectedLine(BaseModel):
+    line_id: str
+    tier: Tier
+
+
+class Decision(BaseModel):
+    outcome: Literal["AUTO_APPROVED", "PENDING_HUMAN", "DENIED"]
+    rules_fired: list[str]
+    context: dict[str, Any]
+
+
+class Order(BaseModel):
+    order_id: str
+    org_id: str
+    offer_id: str
+    offer_hash: str
+    selected: list[SelectedLine]
+    state: OrderState
+    version: int = 1
+    total_net: Decimal
+    decision: Decision | None = None
+    idempotency_key: str
+
+
+class Mandate(BaseModel):
+    org_id: str
+    version: int
+    status: Literal["active", "suspended"] = "active"
+    valid_until: datetime
+    limit_per_order_net: Decimal
+    max_unverified_value_net: Decimal

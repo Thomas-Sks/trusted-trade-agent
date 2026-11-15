@@ -161,3 +161,9 @@ class SqliteStore:
                                     (org_id, *[s.value for s in states])).fetchall()
         orders = [Order.model_validate_json(r[0]) for r in rows]
         return [o for o in orders if o.decided_at is not None and o.decided_at >= since]
+
+    def reset_demo(self) -> None:
+        """Demo reset: forget requests, offers, orders, reservations and tokens (approver pairings are kept)."""
+        with self._lock:
+            for table in ("requests", "offers", "orders", "reservations", "action_tokens"):
+                self._db.execute(f"DELETE FROM {table}")

@@ -131,12 +131,13 @@ def build_live() -> LiveApp:
                               audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer),
                               notifier=telegram, simulated=lambda: scenario.scenario.active(),
                               interpreter=_interpreter())
-    services.demo = DemoControls(scenario=scenario, cache=gateway, clock=clock)
+    services.demo = DemoControls(scenario=scenario, cache=gateway, clock=clock, store=store)
     if telegram:
         from ttap.adapters.inbound.telegram_logic import ApprovalBotLogic
-        pairing = parse_approver_entries(os.environ.get("APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice"))
+        pairing = parse_approver_entries(os.environ.get(
+            "APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice,PAIR-RESTO-B:org_resto_b:chef_bruno"))
         telegram.bind(ApprovalBotLogic(store, services.approvals, pairing, clock,
                                        web_base_url=os.environ.get("TTAP_PUBLIC_URL")))
     keys = parse_agent_keys(os.environ.get("AGENT_KEYS", "demo-key-hotel-a:org_hotel_a,demo-key-resto-b:org_resto_b"))
-    approvers = parse_approver_entries(os.environ.get("APPROVER_KEYS", "approver-key-hotel-a:org_hotel_a:chef_alice"))
+    approvers = parse_approver_entries(os.environ.get("APPROVER_KEYS", "approver-key-hotel-a:org_hotel_a:chef_alice,approver-key-resto-b:org_resto_b:chef_bruno"))
     return LiveApp(services, keys, approvers, telegram, os.environ.get("ADMIN_KEY", "admin-key-valio"))

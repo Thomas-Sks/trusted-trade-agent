@@ -36,6 +36,7 @@ class DemoControls:
     scenario: object  # ScenarioGateway
     cache: object | None  # CachingGateway
     clock: object  # ShiftedClock
+    store: object | None = None  # SqliteStore (for reset)
 
 
 @dataclass
@@ -169,6 +170,18 @@ def create_app(services: Services, agent_keys: dict[str, str],
         if services.demo.cache:
             services.demo.cache.clear()
         return {"active": []}
+
+    @app.post("/admin/reset")
+    def reset_demo(_: str = Depends(admin)) -> dict:
+        services.demo.store.reset_demo()
+        services.demo.scenario.clear()
+        if services.demo.cache:
+            services.demo.cache.clear()
+        return {"reset": True}
+
+    @app.get("/admin/state")
+    def demo_state(_: str = Depends(admin)) -> dict:
+        return {"now": services.demo.clock.now().isoformat(), "scenario": services.demo.scenario.scenario.active()}
 
     @app.post("/admin/clock/advance")
     def advance_clock(body: ClockAdvance, _: str = Depends(admin)) -> dict:

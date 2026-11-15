@@ -1,17 +1,17 @@
 "use client";
 import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, dateTime, euro, ORGS, type Org } from "@/lib/api";
+import {api, dateTime, euro, type OrgProfile } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { AuditLog } from "./AuditLog";
 import { Badge, Card, Empty, RULE_LABEL, StatusBadge } from "./ui";
 
-export function Requests({ org }: { org: Org }) {
+export function Requests({ org }: { org: OrgProfile }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    const tick = async () => { try { const o = await api<Order[]>(ORGS[org].agent, "orders"); if (alive) setOrders(o); } catch { /* retry */ } };
+    const tick = async () => { try { const o = await api<Order[]>(org.agent, "orders"); if (alive) setOrders(o); } catch { /* retry */ } };
     tick(); const id = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(id); };
   }, [org]);

@@ -51,6 +51,7 @@ or `docker compose up --build`.
 
 | Try | Command |
 |---|---|
+| **Onboard yourself** | Console → *Get started*: create an organisation, set its mandate, pair your phone via QR, run the agent |
 | **Watch an agent act** | Console → *Agent live*: Claude's tool calls, results, and every gateway request on the protocol wire (`MCP · lookup`, `REST · replenishment-bot`) |
 | Claude agent over MCP | `uv run --env-file .env python -m buyer_agent.reference_agent "1000 L of lactose-free milk for Monday"` |
 | Plug Claude Desktop / Code | MCP stdio server: `python -m buyer_agent.mcp_server` with `TTAP_URL`, `TTAP_AGENT_KEY` |

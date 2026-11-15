@@ -1,7 +1,7 @@
 "use client";
 import { ArrowRight, CheckCircle2, Clock3, FileSignature, Lock, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ApiError, api, dateTime, euro, num, ORGS, type Org } from "@/lib/api";
+import {ApiError, api, dateTime, euro, num, type OrgProfile } from "@/lib/api";
 import type { Draft, Offer, Order } from "@/lib/types";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { OfferLineView } from "./OfferCard";
@@ -24,7 +24,7 @@ function describe(l: Line) {
   return parts.join(" — ");
 }
 
-export function NewRequest({ org }: { org: Org }) {
+export function NewRequest({ org }: { org: OrgProfile }) {
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<{ lines: Line[]; delivery: typeof MONDAY; assumptions: string[]; questions: string[] } | null>(null);
   const [offer, setOffer] = useState<Offer | null>(null);
@@ -32,7 +32,7 @@ export function NewRequest({ org }: { org: Org }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const role = ORGS[org].agent;
+  const role = org.agent;
 
   useEffect(() => { reset(); }, [org]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -66,7 +66,7 @@ export function NewRequest({ org }: { org: Org }) {
     { key: "lookup", label: "Lookup", state: phase === "compose" ? "todo" : phase === "offer" ? "active" : "done", detail: offer ? (offer.ui_signature_verified ? "Signed offer verified" : "Signature NOT verified") : "Price & availability" },
     { key: "order", label: "Order", state: phase === "result" ? "done" : "todo", detail: total ? `${total} locked` : "Fixed price" },
     { key: "approval", label: "Approval", state: approvalState as FlowStep["state"],
-      detail: !order ? "Mandate or human" : order.state === "PENDING_HUMAN" ? `Waiting for ${ORGS[org].approverName}` : order.approved_by ? `By ${order.approved_by}` : order.state === "AUTO_APPROVED" ? "Within mandate" : order.state.toLowerCase() },
+      detail: !order ? "Mandate or human" : order.state === "PENDING_HUMAN" ? `Waiting for ${org.approverName}` : order.approved_by ? `By ${order.approved_by}` : order.state === "AUTO_APPROVED" ? "Within mandate" : order.state.toLowerCase() },
   ];
 
   return (
@@ -148,7 +148,7 @@ export function NewRequest({ org }: { org: Org }) {
             <div>
               <div className="text-lg font-semibold">
                 {order.state === "AUTO_APPROVED" ? "Order auto-approved" : order.state === "APPROVED" ? `Approved by ${order.approved_by}` :
-                  order.state === "PENDING_HUMAN" ? `Waiting for ${ORGS[org].approverName}'s approval` : order.state === "DENIED" ? "Denied by the mandate" : `Order ${order.state.toLowerCase()}`}
+                  order.state === "PENDING_HUMAN" ? `Waiting for ${org.approverName}'s approval` : order.state === "DENIED" ? "Denied by the mandate" : `Order ${order.state.toLowerCase()}`}
               </div>
               <div className="text-sm text-muted">
                 {order.state === "PENDING_HUMAN" ? "Sent to the web console and Telegram. The price stays locked meanwhile." :

@@ -1,10 +1,24 @@
 export type Role = "agent-hotel" | "agent-resto" | "approver-hotel" | "approver-resto" | "admin" | "public";
-export type Org = "hotel" | "resto";
+/** A credential: a demo role mapped server-side, or the visitor's own key from onboarding. */
+export type Cred = Role | { key: string };
 
-export const ORGS: Record<Org, { label: string; initials: string; agent: Role; approver: Role; approverName: string; pairing: string; limit: string }> = {
-  hotel: { label: "Aurora Hotel", initials: "AH", agent: "agent-hotel", approver: "approver-hotel", approverName: "chef_alice", pairing: "PAIR-HOTEL-A", limit: "€2,000 / order" },
-  resto: { label: "Bistro Bruno", initials: "BB", agent: "agent-resto", approver: "approver-resto", approverName: "chef_bruno", pairing: "PAIR-RESTO-B", limit: "€800 / order" },
-};
+export interface OrgProfile {
+  id: string; label: string; agent: Cred; approver: Cred; approverName: string; pairing: string; limit: string;
+  telegramLink?: string | null; custom?: boolean;
+}
+
+export const DEMO_ORGS: OrgProfile[] = [
+  { id: "hotel", label: "Aurora Hotel (demo)", agent: "agent-hotel", approver: "approver-hotel", approverName: "chef_alice", pairing: "PAIR-HOTEL-A", limit: "€2,000 / order" },
+  { id: "resto", label: "Bistro Bruno (demo)", agent: "agent-resto", approver: "approver-resto", approverName: "chef_bruno", pairing: "PAIR-RESTO-B", limit: "€800 / order" },
+];
+
+const STORAGE = "ttap.myOrgs";
+export function loadMyOrgs(): OrgProfile[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE) ?? "[]"); } catch { return []; }
+}
+export function saveMyOrgs(orgs: OrgProfile[]) {
+  try { localStorage.setItem(STORAGE, JSON.stringify(orgs)); } catch { /* private mode: org lives for this tab only */ }
+}
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, detail: string) {
@@ -12,8 +26,9 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(role: Role, path: string, init?: { method?: string; body?: unknown; idempotencyKey?: string }): Promise<T> {
-  const headers: Record<string, string> = { "x-demo-role": role, "content-type": "application/json" };
+export async function api<T = unknown>(who: Cred, path: string, init?: { method?: string; body?: unknown; idempotencyKey?: string }): Promise<T> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (typeof who === "string") headers["x-demo-role"] = who; else headers["x-ttap-key"] = who.key;
   if (init?.idempotencyKey) headers["idempotency-key"] = init.idempotencyKey;
   const res = await fetch(`/api/ttap/${path.replace(/^\//, "")}`, {
     method: init?.method ?? (init?.body !== undefined ? "POST" : "GET"),

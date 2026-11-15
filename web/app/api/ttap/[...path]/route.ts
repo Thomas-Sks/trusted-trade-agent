@@ -17,7 +17,8 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
   const { path } = await ctx.params;
   const target = `${GATEWAY}/${path.join("/")}${req.nextUrl.search}`;
   const headers: Record<string, string> = { "content-type": "application/json", "x-ttap-via": "web:console" };
-  const key = KEYS[req.headers.get("x-demo-role") ?? ""];
+  // the visitor's own (onboarded) key wins over demo roles
+  const key = req.headers.get("x-ttap-key") ?? KEYS[req.headers.get("x-demo-role") ?? ""];
   if (key) headers.authorization = `Bearer ${key}`;
   const idem = req.headers.get("idempotency-key");
   if (idem) headers["idempotency-key"] = idem;

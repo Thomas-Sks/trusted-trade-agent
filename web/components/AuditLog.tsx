@@ -1,21 +1,21 @@
 "use client";
 import { ScrollText, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, ORGS, time, type Org } from "@/lib/api";
+import {api, time, type OrgProfile } from "@/lib/api";
 import type { AuditEvent } from "@/lib/types";
 import { Badge, Button, Card, Empty } from "./ui";
 
 const STEP_TONE = { request: "accent", lookup: "info", order: "neutral", approval: "warn" } as const;
 const ACTOR = (a: string) => a.startsWith("agent") ? "Agent" : a.startsWith("policy") ? "Policy engine" : a.startsWith("approver") ? a.split(":")[1] : a.startsWith("llm") ? "Interpreter (LLM)" : "Gateway";
 
-export function AuditLog({ org, filter }: { org: Org; filter?: string }) {
+export function AuditLog({ org, filter }: { org: OrgProfile; filter?: string }) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [step, setStep] = useState<string>("all");
   const [report, setReport] = useState<{ valid: boolean; events: number; problems: string[] } | null>(null);
 
   useEffect(() => {
     let alive = true;
-    const tick = async () => { try { const e = await api<AuditEvent[]>(ORGS[org].agent, "audit"); if (alive) setEvents(e); } catch { /* retry */ } };
+    const tick = async () => { try { const e = await api<AuditEvent[]>(org.agent, "audit"); if (alive) setEvents(e); } catch { /* retry */ } };
     tick(); const id = setInterval(tick, 3000);
     return () => { alive = false; clearInterval(id); };
   }, [org]);
@@ -30,7 +30,7 @@ export function AuditLog({ org, filter }: { org: Org; filter?: string }) {
         ))}
         <div className="ml-auto flex items-center gap-2">
           {report && <Badge tone={report.valid ? "ok" : "bad"}>{report.valid ? `Chain intact · ${report.events} signed events` : `${report.problems.length} problem(s)`}</Badge>}
-          <Button variant="secondary" onClick={async () => setReport(await api(ORGS[org].agent, "audit/verify"))}><ShieldCheck className="size-4" />Verify chain</Button>
+          <Button variant="secondary" onClick={async () => setReport(await api(org.agent, "audit/verify"))}><ShieldCheck className="size-4" />Verify chain</Button>
         </div>
       </div>
       {shown.length === 0 ? <Empty icon={<ScrollText className="size-5" />} title="No events yet" text="Every step of every order is recorded here, hash-chained and signed." /> : (

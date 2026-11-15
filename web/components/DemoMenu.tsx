@@ -27,7 +27,7 @@ export function DemoMenu() {
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted ring-1 ring-line hover:bg-page">
         <FlaskConical className="size-4" />
-        <span className="hidden whitespace-nowrap lg:inline">{state ? dateTime(state.now) : "Demo"}</span>
+        <span className="hidden whitespace-nowrap 2xl:inline">{state ? dateTime(state.now) : "Demo"}</span>
         {state && state.scenario.length > 0 && <span className="size-2 rounded-full bg-warn" />}
       </button>
       {open && (

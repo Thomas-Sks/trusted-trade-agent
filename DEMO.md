@@ -1,5 +1,10 @@
 # Demo script (5 minutes)
 
+**Self-service option (jury hands-on):** share the console URL. *Get started* → organisation name + approver →
+mandate limits (pre-filled) → scan the QR with the phone and press *Start* in Telegram (the screen turns to
+"Phone paired" by itself) → *Watch the agent buy*. Asking for 3,000 L of milk sends the approval card to the
+judge's own phone.
+
 **Before:** gateway + console running, Telegram paired (`/start PAIR-HOTEL-A`), demo menu → *Reset demo data*.
 
 0. **Watch the agent act (60 s) — open on this.** Agent live tab → *Run Claude agent (MCP)* with the free-text

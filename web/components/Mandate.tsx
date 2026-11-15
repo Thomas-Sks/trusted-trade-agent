@@ -1,7 +1,7 @@
 "use client";
 import { ArrowRight, History, Pause, Play, Scale } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ApiError, api, euro, ORGS, type Org } from "@/lib/api";
+import {ApiError, api, euro, type OrgProfile } from "@/lib/api";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
 interface MandateDoc { version: number; status: string; limit_per_order_net: string; max_unverified_value_net: string; period_budget_net: string | null; max_orders_per_hour: number | null }
@@ -15,12 +15,12 @@ const FIELDS = [
   { key: "max_orders_per_hour", label: "Max orders per hour", unit: "" },
 ] as const;
 
-export function Mandate({ org }: { org: Org }) {
+export function Mandate({ org }: { org: OrgProfile }) {
   const [current, setCurrent] = useState<MandateDoc | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [sim, setSim] = useState<Sim | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const role = ORGS[org].approver;
+  const role = org.approver;
 
   useEffect(() => {
     setSim(null);
@@ -47,7 +47,7 @@ export function Mandate({ org }: { org: Org }) {
       <Card className="h-fit space-y-4 p-5">
         <div className="flex items-center gap-2">
           <Scale className="size-5 text-accent" />
-          <div><div className="font-semibold">Mandate of {ORGS[org].label}</div>
+          <div><div className="font-semibold">Mandate of {org.label}</div>
             <div className="text-xs text-muted">Version {current?.version ?? "—"} · enforced by Cedar policies</div></div>
         </div>
         {current && (

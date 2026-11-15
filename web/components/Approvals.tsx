@@ -2,7 +2,7 @@
 import { Check, Gauge, Inbox, Smartphone, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useState } from "react";
-import { api, dateTime, euro, num, ORGS, type Org } from "@/lib/api";
+import {api, dateTime, euro, num, type OrgProfile } from "@/lib/api";
 import type { ApprovalCard, Order } from "@/lib/types";
 import { Badge, Button, Card, Empty } from "./ui";
 
@@ -15,12 +15,12 @@ function cutoff(min: number | null) {
   return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
 }
 
-export function Approvals({ org, onCount }: { org: Org; onCount: (n: number) => void }) {
+export function Approvals({ org, onCount }: { org: OrgProfile; onCount: (n: number) => void }) {
   const [items, setItems] = useState<{ order: Order; card: ApprovalCard }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState<{ summary: string; rubber_stamp_risk: boolean; approved_under_5s_pct: number | null } | null>(null);
-  const role = ORGS[org].approver;
+  const role = org.approver;
 
   const load = useCallback(async () => {
     try {
@@ -74,12 +74,12 @@ export function Approvals({ org, onCount }: { org: Org; onCount: (n: number) => 
             </div>
           </Card>
         )}
-        {BOT && (
+        {(org.telegramLink || BOT) && (
           <Card className="flex items-center gap-4 p-4">
-            <QRCodeSVG value={`https://t.me/${BOT}?start=${ORGS[org].pairing}`} size={72} fgColor="#17162b" />
+            <QRCodeSVG value={org.telegramLink ?? `https://t.me/${BOT}?start=${org.pairing}`} size={72} fgColor="#17162b" />
             <div className="text-xs text-muted">
               <div className="mb-0.5 flex items-center gap-1 text-sm font-semibold text-ink"><Smartphone className="size-4" />Approve on your phone</div>
-              Scan to pair {ORGS[org].approverName} with the Telegram bot. One-time signed buttons.
+              Scan to pair {org.approverName} with the Telegram bot. One-time signed buttons.
             </div>
           </Card>
         )}

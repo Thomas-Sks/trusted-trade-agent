@@ -1,7 +1,7 @@
 "use client";
 import { Bot, BrainCircuit, CheckCircle2, CircleAlert, Cpu, Play, Plug, Radio, Sparkles, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { api, euro, num, ORGS, type Org } from "@/lib/api";
+import {api, euro, num, type OrgProfile } from "@/lib/api";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
@@ -64,7 +64,7 @@ function ResultView({ tool, result }: { tool: string; result: unknown }) {
 }
 
 /* ---------- component ---------- */
-export function AgentLive({ org }: { org: Org }) {
+export function AgentLive({ org }: { org: OrgProfile }) {
   const [text, setText] = useState(DEFAULT);
   const [events, setEvents] = useState<Ev[]>([]);
   const [running, setRunning] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function AgentLive({ org }: { org: Org }) {
     cursor.current = 0; setWire([]);
     const tick = async () => {
       try {
-        const rows = await api<Wire[]>(ORGS[org].agent, `trace?after=${cursor.current}`);
+        const rows = await api<Wire[]>(org.agent, `trace?after=${cursor.current}`);
         if (alive && rows.length) { cursor.current = rows[rows.length - 1].id; setWire((w) => [...w, ...rows].slice(-120)); }
       } catch { /* gateway restarting */ }
     };
@@ -91,7 +91,7 @@ export function AgentLive({ org }: { org: Org }) {
   async function run(kind: "claude" | "bot") {
     setEvents([]); setRunning(kind);
     try {
-      const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org, text }) });
+      const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org: org.id, text, agent_key: typeof org.agent === "string" ? undefined : org.agent.key }) });
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -128,7 +128,7 @@ export function AgentLive({ org }: { org: Org }) {
         <Card className="h-fit space-y-4 p-5">
           <div>
             <div className="font-semibold">Run a buying agent</div>
-            <div className="text-xs text-muted">Buyer side · {ORGS[org].label}</div>
+            <div className="text-xs text-muted">Buyer side · {org.label}</div>
           </div>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4}
             className="w-full resize-none rounded-lg border border-line p-3 text-sm outline-none focus:border-accent focus:ring-4 focus:ring-accent/10" />

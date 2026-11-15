@@ -9,6 +9,11 @@ type Ev = { type: string; text?: string; tool?: string; input?: Record<string, u
 type Wire = { id: number; time: number; method: string; path: string; status: number; ms: number; via: string };
 
 const DEFAULT = "We need 1,000 litres of lactose-free milk for Monday, Finnish if possible.";
+const QUICK = [
+  { title: "Lactose-free milk", hint: "1,000 L, Finnish preferred", text: DEFAULT },
+  { title: "Cherry tomatoes", hint: "2,500 kg of our usual product", text: "Order 2,500 kg of our usual cherry tomatoes for Monday." },
+  { title: "Large milk order", hint: "3,000 L, above the order limit", text: "We need 3,000 litres of lactose-free milk for Monday." },
+];
 const STEP_OF: Record<string, string> = { interpret_request: "request", create_request: "request", lookup: "lookup", place_order: "order" };
 
 /* ---------- human-readable tool inputs & results ---------- */
@@ -64,8 +69,11 @@ function ResultView({ tool, result }: { tool: string; result: unknown }) {
 }
 
 /* ---------- component ---------- */
-export function AgentLive({ org }: { org: OrgProfile }) {
-  const [text, setText] = useState(DEFAULT);
+export interface Launch { text: string; welcome?: string; nonce: number }
+
+export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | null }) {
+  const [text, setText] = useState(launch?.text ?? DEFAULT);
+  const [welcome, setWelcome] = useState<string | null>(launch?.welcome ?? null);
   const [events, setEvents] = useState<Ev[]>([]);
   const [running, setRunning] = useState<string | null>(null);
   const [wire, setWire] = useState<Wire[]>([]);
@@ -87,6 +95,10 @@ export function AgentLive({ org }: { org: OrgProfile }) {
   }, [org]);
 
   useEffect(() => { feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" }); }, [events]);
+  useEffect(() => {  // arriving from onboarding: pre-fill a request above the limit so the phone gets a card
+    if (!launch) return;
+    setText(launch.text); setWelcome(launch.welcome ?? null); setEvents([]);  // eslint-disable-line react-hooks/set-state-in-effect
+  }, [launch]);
 
   async function run(kind: "claude" | "bot") {
     setEvents([]); setRunning(kind);
@@ -123,6 +135,13 @@ export function AgentLive({ org }: { org: OrgProfile }) {
 
   return (
     <div className="space-y-5">
+      {welcome && (
+        <div className="animate-in flex flex-wrap items-center gap-3 rounded-xl border border-accent/25 bg-accent-soft/50 px-5 py-4">
+          <CheckCircle2 className="size-5 text-accent" />
+          <div className="text-sm"><b>{org.label} is ready.</b> {welcome}</div>
+          <button onClick={() => setWelcome(null)} className="ml-auto text-xs text-muted hover:text-ink">Dismiss</button>
+        </div>
+      )}
       <Card className="px-6 py-5"><FlowTracker steps={steps} /></Card>
       <div className="grid gap-5 lg:grid-cols-[300px_1fr_380px]">
         <Card className="h-fit space-y-4 p-5">
@@ -130,9 +149,18 @@ export function AgentLive({ org }: { org: OrgProfile }) {
             <div className="font-semibold">Run a buying agent</div>
             <div className="text-xs text-muted">Buyer side · {org.label}</div>
           </div>
+          <div className="space-y-1.5">
+            {QUICK.map((q) => (
+              <button key={q.title} disabled={!!running} onClick={() => { setText(q.text); setEvents([]); }}
+                className={`w-full rounded-lg border px-3 py-2 text-left transition hover:border-accent/50 ${text === q.text ? "border-accent bg-accent-soft/40" : "border-line"}`}>
+                <div className="text-sm font-medium">{q.title}</div>
+                <div className="text-xs text-muted">{q.hint}</div>
+              </button>
+            ))}
+          </div>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4}
             className="w-full resize-none rounded-lg border border-line p-3 text-sm outline-none focus:border-accent focus:ring-4 focus:ring-accent/10" />
-          <Button className="w-full" disabled={!!running} onClick={() => run("claude")}><Sparkles className="size-4" />{running === "claude" ? "Agent working…" : "Run Claude agent (MCP)"}</Button>
+          <Button className={`w-full ${welcome && events.length === 0 ? "animate-pulse" : ""}`} disabled={!!running} onClick={() => run("claude")}><Sparkles className="size-4" />{running === "claude" ? "Agent working…" : welcome ? "Run my agent" : "Run Claude agent (MCP)"}</Button>
           <Button className="w-full" variant="secondary" disabled={!!running} onClick={() => run("bot")}><Cpu className="size-4" />{running === "bot" ? "Bot working…" : "Run replenishment bot (REST)"}</Button>
           <p className="text-xs text-muted">Same protocol, two very different clients: an LLM over MCP and a plain script over REST. Both are governed by the same mandate.</p>
         </Card>

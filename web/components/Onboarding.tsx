@@ -15,7 +15,7 @@ const LIMITS = [
 interface Created { org_id: string; name: string; approver_name: string; agent_key: string; approver_key: string; pairing_code: string; telegram_link: string | null }
 
 function Steps({ step }: { step: number }) {
-  const labels = ["Organisation", "Mandate", "Phone", "Go"];
+  const labels = ["Organisation", "Mandate", "Phone", "Watch your agent"];
   return (
     <ol className="flex items-center gap-2">
       {labels.map((l, i) => (
@@ -31,7 +31,7 @@ function Steps({ step }: { step: number }) {
   );
 }
 
-export function Onboarding({ onCreated, onGo }: { onCreated: (o: OrgProfile) => void; onGo: (tab: "live" | "new") => void }) {
+export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) => void; onReady: (limitPerOrder: number, paired: boolean) => void }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [approver, setApprover] = useState("");
@@ -123,31 +123,13 @@ export function Onboarding({ onCreated, onGo }: { onCreated: (o: OrgProfile) => 
             </div>
           ) : <p className="text-sm text-muted">Telegram is not configured on this server: approvals happen in the web console.</p>}
           <div className="flex justify-end gap-2">
-            {!paired && <Button variant="ghost" onClick={() => setStep(3)}>Skip — use the web console</Button>}
-            <Button disabled={!paired && !!created.telegram_link} onClick={() => setStep(3)}>Continue <ArrowRight className="size-4" /></Button>
+            {!paired && <Button variant="ghost" onClick={() => onReady(Number(limits.limit_per_order_net), false)}>Skip — approve in the web console</Button>}
+            <Button disabled={!paired && !!created.telegram_link} onClick={() => onReady(Number(limits.limit_per_order_net), paired)}>
+              <Sparkles className="size-4" />Watch my agent buy <ArrowRight className="size-4" /></Button>
           </div>
         </Card>
       )}
 
-      {step === 3 && created && (
-        <Card className="animate-in space-y-5 p-6 text-center">
-          <div className="mx-auto grid size-12 place-items-center rounded-full bg-ok-soft text-ok"><Check className="size-6" /></div>
-          <div>
-            <div className="text-lg font-semibold">{created.name} is ready</div>
-            <div className="mt-1 flex flex-wrap justify-center gap-1.5">
-              <Badge tone="accent">€{Number(limits.limit_per_order_net).toLocaleString("en-IE")} per order</Badge>
-              <Badge>€{Number(limits.period_budget_net).toLocaleString("en-IE")} / week</Badge>
-              <Badge>{limits.max_orders_per_hour} orders / hour</Badge>
-              {paired && <Badge tone="ok">Telegram paired</Badge>}
-            </div>
-          </div>
-          <p className="text-sm text-muted">Try a request above your limit (e.g. 3,000 L of milk) to receive an approval on your phone.</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={() => onGo("live")}><Sparkles className="size-4" />Watch the agent buy</Button>
-            <Button variant="secondary" onClick={() => onGo("new")}>Make a request myself</Button>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

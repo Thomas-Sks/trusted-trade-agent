@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AgentLive } from "@/components/AgentLive";
+import { AgentLive, type Launch } from "@/components/AgentLive";
 import { Approvals } from "@/components/Approvals";
 import { AuditLog } from "@/components/AuditLog";
 import { DemoMenu } from "@/components/DemoMenu";
@@ -30,6 +30,17 @@ export default function Home() {
   useEffect(() => {
     const saved = loadMyOrgs();
     if (saved.length) { setMine(saved); setOrgId(saved[0].id); setTab("live"); }  // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+  const [launch, setLaunch] = useState<Launch | null>(null);
+  const onReady = useCallback((limit: number, paired: boolean) => {
+    // a request deliberately above the new mandate's per-order limit: the approval path shows up on the phone
+    const litres = Math.max(1000, Math.ceil((limit * 1.6) / 1.01 / 100) * 100);
+    setLaunch({
+      text: `We need ${litres.toLocaleString("en-IE")} litres of lactose-free milk for Monday, Finnish if possible.`,
+      welcome: `Your agent will buy within €${limit.toLocaleString("en-IE")} per order; this request is above it, so ${paired ? "the approval will arrive on your phone" : "you will approve it in the Approvals tab"}. Press “Run my agent” and watch each step.`,
+      nonce: Date.now(),
+    });
+    setTab("live");
   }, []);
   const addOrg = useCallback((o: OrgProfile) => {
     setMine((prev) => { const next = [o, ...prev.filter((p) => p.id !== o.id)]; saveMyOrgs(next); return next; });
@@ -71,8 +82,8 @@ export default function Home() {
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className={tab === "start" ? "" : "hidden"}><Onboarding onCreated={addOrg} onGo={setTab} /></div>
-        <div className={tab === "live" ? "" : "hidden"}><AgentLive key={org.id} org={org} /></div>
+        <div className={tab === "start" ? "" : "hidden"}><Onboarding onCreated={addOrg} onReady={onReady} /></div>
+        <div className={tab === "live" ? "" : "hidden"}><AgentLive key={org.id} org={org} launch={launch} /></div>
         <div className={tab === "new" ? "" : "hidden"}><NewRequest key={org.id} org={org} /></div>
         {tab === "requests" && <Requests key={org.id} org={org} />}
         <div className={tab === "approvals" ? "" : "hidden"}><Approvals key={org.id} org={org} onCount={onCount} /></div>

@@ -7,7 +7,7 @@ import { DemoMenu } from "@/components/DemoMenu";
 import { Kitchen } from "@/components/Kitchen";
 import { Onboarding } from "@/components/Onboarding";
 import { Requests } from "@/components/Requests";
-import { DEMO_ORGS, loadMyOrgs, saveMyOrgs, type OrgProfile } from "@/lib/api";
+import { createSandbox, DEMO_ORGS, loadMyOrgs, presenterCode, saveMyOrgs, type OrgProfile } from "@/lib/api";
 
 const TABS = [
   { key: "kitchen", label: "Kitchen" },
@@ -23,11 +23,19 @@ export default function Home() {
   const [mine, setMine] = useState<OrgProfile[]>([]);
   const [orgId, setOrgId] = useState("resto");
   const [tab, setTab] = useState<Tab>("kitchen");
-  const orgs = useMemo(() => [...mine, ...DEMO_ORGS], [mine]);
-  const org = orgs.find((o) => o.id === orgId) ?? DEMO_ORGS[0];
+  const [presenter, setPresenter] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const orgs = useMemo(() => (presenter ? [...mine, ...DEMO_ORGS] : mine), [mine, presenter]);
+  const org = orgs.find((o) => o.id === orgId) ?? orgs[0];
   useEffect(() => {
+    const isPresenter = !!presenterCode();
+    setPresenter(isPresenter);  // eslint-disable-line react-hooks/set-state-in-effect
     const saved = loadMyOrgs();
-    if (saved.length) { setMine(saved); setOrgId(saved[0].id); }  // eslint-disable-line react-hooks/set-state-in-effect
+    if (saved.length) { setMine(saved); setOrgId(saved[0].id); return; }
+    if (isPresenter) return;
+    createSandbox()  // first visit: a private copy of the bistro for this browser
+      .then((o) => { setMine([o]); saveMyOrgs([o]); setOrgId(o.id); })
+      .catch((e) => setSetupError(String(e)));
   }, []);
   const [launch, setLaunch] = useState<Launch | null>(null);
   const onReady = useCallback((limit: number, paired: boolean) => {
@@ -71,21 +79,25 @@ export default function Home() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <DemoMenu />
-            <select value={org.id} onChange={(e) => setOrgId(e.target.value)}
+            {presenter && <DemoMenu />}
+            {org && <select value={org.id} onChange={(e) => setOrgId(e.target.value)}
               className="w-[190px] truncate rounded-lg bg-white px-2.5 py-1.5 text-sm font-medium ring-1 ring-line outline-none">
               {orgs.map((o) => <option key={o.id} value={o.id}>{o.label} · {o.limit}</option>)}
-            </select>
+            </select>}
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
+        {!org ? (
+          <div className="grid place-items-center py-24 text-sm text-muted">{setupError ? `Could not prepare your sandbox: ${setupError}` : "Preparing your private bistro…"}</div>
+        ) : (<>
         <div className={tab === "start" ? "" : "hidden"}><Onboarding onCreated={addOrg} onReady={onReady} /></div>
         {tab === "kitchen" && <Kitchen key={org.id} org={org} />}
         <div className={tab === "live" ? "" : "hidden"}><AgentLive key={org.id} org={org} launch={launch} /></div>
         {tab === "requests" && <Requests key={org.id} org={org} />}
         <div className={tab === "approvals" ? "" : "hidden"}><Approvals key={org.id} org={org} onCount={onCount} /></div>
         {tab === "audit" && <AuditLog key={org.id} org={org} />}
+        </>)}
       </main>
     </div>
   );

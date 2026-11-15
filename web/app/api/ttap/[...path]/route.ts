@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import type { JWK } from "jose";
 import { verifyOffer } from "@/lib/verify";
 import { limitLlm } from "@/lib/ratelimit";
+import { isPresenter, presenterOnly } from "@/lib/presenter";
 
 const KEYS: Record<string, string | undefined> = {
   "agent-hotel": process.env.KEY_AGENT_HOTEL,
@@ -20,7 +21,9 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
   if (req.method === "POST" && path.at(-1) === "interpret") { const limited = limitLlm(req, "interpret"); if (limited) return limited; }
   const headers: Record<string, string> = { "content-type": "application/json", "x-ttap-via": "web:console" };
   // the visitor's own (onboarded) key wins over demo roles
-  const key = req.headers.get("x-ttap-key") ?? KEYS[req.headers.get("x-demo-role") ?? ""];
+  const role = req.headers.get("x-demo-role");
+  if (!req.headers.get("x-ttap-key") && role && role !== "public" && !isPresenter(req)) return presenterOnly();
+  const key = req.headers.get("x-ttap-key") ?? KEYS[role ?? ""];
   if (key) headers.authorization = `Bearer ${key}`;
   const idem = req.headers.get("idempotency-key");
   if (idem) headers["idempotency-key"] = idem;

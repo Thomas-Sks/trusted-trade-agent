@@ -5,9 +5,11 @@ from pathlib import Path
 from ttap.adapters.outbound.catalog_json import JsonCatalog
 from ttap.adapters.outbound.cedar_engine import CedarPolicyEngine
 from ttap.adapters.outbound.clocks import FixedClock
+from ttap.adapters.outbound.jsonl_audit import MemoryAuditLog
 from ttap.adapters.outbound.jws_signer import EcdsaSigner
 from ttap.adapters.outbound.memory_mandates import InMemoryMandates
 from ttap.adapters.outbound.sqlite_store import SqliteStore
+from ttap.application.auditing import Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
@@ -30,11 +32,16 @@ class Env:
             limit_per_order_net=Decimal(limit), max_unverified_value_net=Decimal("500"))})
         counter = iter(range(1, 10_000))
         new_id = lambda prefix: f"{prefix}_{next(counter)}"  # noqa: E731
-        self.requests = RequestService(self.store, new_id)
-        self.lookup = LookupService(catalog, gateway, self.signer, self.clock, self.store, new_id,
+        self.mandates = mandates
+        self.policy = CedarPolicyEngine.from_file(POLICIES)
+        self.audit = MemoryAuditLog(self.signer)
+        self.auditor = Auditor(self.audit, self.clock, new_id)
+        self.new_id = new_id
+        self.requests = RequestService(self.store, new_id, self.auditor)
+        self.lookup = LookupService(catalog, gateway, self.signer, self.clock, self.store, new_id, self.auditor,
                                     offer_ttl=timedelta(minutes=30))
-        self.orders = OrderService(self.store, self.signer, CedarPolicyEngine.from_file(POLICIES), mandates,
-                                   self.clock, new_id)
+        self.orders = OrderService(self.store, self.signer, self.policy, mandates, self.clock, new_id,
+                                   self.auditor)
 
     async def offer(self, litres: str = "1000", org: str = "org_a"):
         req = self.requests.create(org, [RequestLine(

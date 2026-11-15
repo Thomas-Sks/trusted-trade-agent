@@ -7,3 +7,4 @@ __pycache__/
 resources/*.json
 resources/*.csv
 ttap_signing_key.json
+audit.jsonl

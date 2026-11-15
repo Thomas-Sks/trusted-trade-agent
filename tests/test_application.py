@@ -52,3 +52,16 @@ async def test_expired_and_tampered_offers_rejected():
     env.store._write("UPDATE offers SET body = ? WHERE id = ?", (forged.model_dump_json(), offer2.offer_id))
     with pytest.raises(InvalidOfferSignature):
         env.orders.place("org_a", offer2.offer_id, GOOD, "idem-3")
+
+
+async def test_nominal_flow_is_fully_audited_in_step_order():
+    env = Env(limit="500")
+    offer = await env.offer()
+    order = env.orders.place("org_a", offer.offer_id, GOOD, "idem-a")
+    events = env.audit.list("org_a")
+    assert [(e.step, e.type) for e in events] == [
+        ("request", "org.ttap.request.created.v1"), ("lookup", "org.ttap.lookup.offer_issued.v1"),
+        ("order", "org.ttap.order.created.v1"), ("approval", "org.ttap.approval.decided.v1")]
+    assert events[-1].outcome == "PENDING_HUMAN"
+    assert "plafond par commande 500 €" in events[-1].explanation
+    assert order.mandate_version == 1 and order.decided_at == DEMO_NOW

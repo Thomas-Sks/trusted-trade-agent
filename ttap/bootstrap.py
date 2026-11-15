@@ -12,10 +12,12 @@ from ttap.adapters.inbound.rest_api import Services
 from ttap.adapters.outbound.catalog_json import JsonCatalog
 from ttap.adapters.outbound.cedar_engine import CedarPolicyEngine
 from ttap.adapters.outbound.clocks import ShiftedClock
+from ttap.adapters.outbound.jsonl_audit import JsonlAuditLog, MemoryAuditLog
 from ttap.adapters.outbound.jws_signer import EcdsaSigner
 from ttap.adapters.outbound.memory_mandates import InMemoryMandates
 from ttap.adapters.outbound.sqlite_store import SqliteStore
 from ttap.adapters.outbound.valio_gateway import ValioGateway
+from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
@@ -48,14 +50,15 @@ def demo_mandates() -> InMemoryMandates:
 
 def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: Clock,
                    store: Store | None = None, signer: Signer | None = None,
-                   mandates: MandateRepository | None = None) -> Services:
+                   mandates: MandateRepository | None = None, audit: AuditLog | None = None) -> Services:
     store = store or SqliteStore()
     signer = signer or EcdsaSigner()
     mandates = mandates or demo_mandates()
+    auditor = Auditor(audit or MemoryAuditLog(signer), clock, new_id)
     return Services(
-        requests=RequestService(store, new_id),
-        lookup=LookupService(catalog, gateway, signer, clock, store, new_id),
-        orders=OrderService(store, signer, CedarPolicyEngine.from_file(POLICIES), mandates, clock, new_id),
+        requests=RequestService(store, new_id, auditor),
+        lookup=LookupService(catalog, gateway, signer, clock, store, new_id, auditor),
+        orders=OrderService(store, signer, CedarPolicyEngine.from_file(POLICIES), mandates, clock, new_id, auditor),
         signer=signer,
     )
 
@@ -66,7 +69,9 @@ def build_live() -> tuple[Services, dict[str, str]]:
     client = httpx.AsyncClient(base_url=os.environ.get("VALIO_BASE_URL", "https://junction26.valioaimo.fi"),
                                timeout=30.0)
     gateway = ValioGateway(client, os.environ["VALIO_API_KEY"])
+    signer = EcdsaSigner.load_or_create(os.environ.get("TTAP_SIGNING_KEY", str(ROOT / "ttap_signing_key.json")))
     services = build_services(catalog, gateway, ShiftedClock(DEMO_START),
-                              store=SqliteStore(os.environ.get("TTAP_DB", "ttap.db")))
+                              store=SqliteStore(os.environ.get("TTAP_DB", "ttap.db")), signer=signer,
+                              audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer))
     keys = parse_agent_keys(os.environ.get("AGENT_KEYS", "demo-key-hotel-a:org_hotel_a,demo-key-resto-b:org_resto_b"))
     return services, keys

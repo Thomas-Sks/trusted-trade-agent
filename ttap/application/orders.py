@@ -50,6 +50,9 @@ class OrderService:
             raise NotFound(f"order {order_id}")
         return order
 
+    def list(self, org_id: str) -> list[Order]:
+        return self._store.list_orders(org_id)
+
     def _replay(self, existing: Order, offer_id: str, selected: list[SelectedLine]) -> Order:
         if existing.offer_id != offer_id or existing.selected != selected:
             raise IdempotencyMismatch("same Idempotency-Key, different body")

@@ -81,3 +81,10 @@ def test_escalation_then_human_approval_and_verified_audit():
     assert report["valid"] is True and report["events"] == 6
     types = [e["type"] for e in c.get("/audit", headers=APPROVER).json()]
     assert types[-2:] == ["org.ttap.approval.escalated.v1", "org.ttap.approval.approved.v1"]
+
+
+def test_list_orders_is_scoped_to_the_organisation():
+    c = client()
+    order = place(c)
+    assert [o["order_id"] for o in c.get("/orders", headers=A).json()] == [order["order_id"]]
+    assert c.get("/orders", headers=B).json() == []

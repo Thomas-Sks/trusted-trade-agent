@@ -214,8 +214,12 @@ def create_app(services: Services, agent_keys: dict[str, str],
                 log.exception("escalation delivery failed for %s", order.order_id)
         return order
 
+    @app.get("/orders", response_model=list[Order])
+    def list_orders(org: str = Depends(any_org)) -> list[Order]:
+        return services.orders.list(org)
+
     @app.get("/orders/{order_id}", response_model=Order)
-    def get_order(order_id: str, org: str = Depends(org_id)) -> Order:
+    def get_order(order_id: str, org: str = Depends(any_org)) -> Order:
         return services.orders.get(org, order_id)
 
     @app.get("/approvals", response_model=list[Order])

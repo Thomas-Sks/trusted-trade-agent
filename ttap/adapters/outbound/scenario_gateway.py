@@ -15,10 +15,12 @@ class Scenario(BaseModel):
     stock_override: dict[str, Decimal] = {}
     price_increase_pct: dict[str, Decimal] = {}
     outage: bool = False
+    rename: dict[str, str] = {}  # red-team: hostile supplier text in product names (prompt injection)
 
     def active(self) -> list[str]:
         out = [f"stock:{p}={v}" for p, v in self.stock_override.items()]
         out += [f"price:{p}+{v}%" for p, v in self.price_increase_pct.items()]
+        out += [f"injected-name:{p}" for p in self.rename]
         return out + (["outage"] if self.outage else [])
 
 
@@ -55,3 +57,24 @@ class ScenarioGateway:
             if pid in out:
                 out[pid] = out[pid].model_copy(update={"available_amount": amount, "logistic_model": "Stock"})
         return out
+
+
+class ScenarioCatalog:
+    """Catalog decorator for the red-team demo: product names can carry hostile supplier text."""
+
+    def __init__(self, inner, gateway: ScenarioGateway):
+        self._inner, self._gateway = inner, gateway
+
+    @property
+    def version(self) -> str:
+        return self._inner.version
+
+    def _apply(self, p):
+        name = self._gateway.scenario.rename.get(p.product_id) if p is not None else None
+        return p.model_copy(update={"names": {**p.names, "en": name}}) if name else p
+
+    def get(self, product_id: str):
+        return self._apply(self._inner.get(product_id))
+
+    def search(self, text: str, limit: int = 200):
+        return [self._apply(p) for p in self._inner.search(text, limit)]

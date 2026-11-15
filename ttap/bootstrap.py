@@ -18,7 +18,7 @@ from ttap.adapters.outbound.jsonl_audit import JsonlAuditLog, MemoryAuditLog
 from ttap.adapters.outbound.jws_signer import EcdsaSigner
 from ttap.adapters.outbound.logging_notifier import LoggingNotifier
 from ttap.adapters.outbound.memory_mandates import InMemoryMandates
-from ttap.adapters.outbound.scenario_gateway import ScenarioGateway
+from ttap.adapters.outbound.scenario_gateway import ScenarioCatalog, ScenarioGateway
 from ttap.adapters.outbound.sqlite_store import SqliteStore
 from ttap.adapters.outbound.valio_gateway import ValioGateway
 from ttap.application.approvals import ApprovalService
@@ -129,6 +129,7 @@ def build_live() -> LiveApp:
     if os.environ.get("TELEGRAM_BOT_TOKEN"):
         from ttap.adapters.outbound.telegram_notifier import TelegramNotifier
         telegram = TelegramNotifier(os.environ["TELEGRAM_BOT_TOKEN"], store)
+    catalog = ScenarioCatalog(catalog, scenario)
     services = build_services(catalog, gateway, clock, store=store, signer=signer,
                               audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer),
                               notifier=telegram, simulated=lambda: scenario.scenario.active(),

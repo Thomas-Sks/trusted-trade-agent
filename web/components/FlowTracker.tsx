@@ -1,9 +1,9 @@
-import { Check, FileText, Loader2, Search, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { Check, ClipboardList, FileText, Loader2, Search, ShieldCheck, ShoppingCart, X } from "lucide-react";
 
 export type StepState = "todo" | "active" | "done" | "waiting" | "blocked";
 export interface FlowStep { key: string; label: string; detail?: string; state: StepState }
 
-const ICONS = { request: FileText, lookup: Search, order: ShoppingCart, approval: ShieldCheck } as const;
+const ICONS = { inventory: ClipboardList, request: FileText, lookup: Search, order: ShoppingCart, approval: ShieldCheck } as const;
 const RING: Record<StepState, string> = {
   todo: "bg-white text-muted ring-line",
   active: "bg-accent text-white ring-accent shadow-[0_0_0_6px_rgba(91,76,240,0.12)]",

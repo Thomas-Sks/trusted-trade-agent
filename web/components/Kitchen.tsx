@@ -1,14 +1,16 @@
 "use client";
-import { Bot, BrainCircuit, ChefHat, CircleAlert, Cpu, RotateCcw, Sparkles, Utensils, Wrench } from "lucide-react";
+import { Bot, BrainCircuit, Check, ChefHat, CircleAlert, Cpu, Hourglass, PackageCheck, RotateCcw, Smartphone, Sparkles, Truck, Utensils, Wrench, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { euro, num, type OrgProfile } from "@/lib/api";
+import { api, ApiError, euro, num, type OrgProfile } from "@/lib/api";
 import { describeCall, ResultView, type Ev } from "./AgentLive";
+import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL } from "./ui";
 
-type OrderView = { order_id: string; state: string; total_net: string; rules_fired: string[]; approved_by?: string | null };
+type OrderView = { order_id: string; state: string; total_net: string; rules_fired: string[]; approved_by?: string | null; received: boolean; category: string; items: string[] };
+const DELIVERED = ["AUTO_APPROVED", "APPROVED"];
 type Item = {
   key: string; label: string; category: string; product_id: string; unit: string;
-  on_hand: number; reorder_point: number; par: number; low: boolean; order_quantity: number; order: OrderView | null;
+  on_hand: number; reorder_point: number; par: number; low: boolean; order_quantity: number; incoming: number; order: OrderView | null;
 };
 type State = { items: Item[]; services: number; orders: OrderView[] };
 
@@ -22,8 +24,8 @@ async function kitchen<T>(org: OrgProfile, action: string): Promise<T> {
 
 function status(it: Item): { tone: "ok" | "warn" | "bad" | "accent" | "neutral"; text: string } {
   const o = it.order;
-  if (o?.state === "AUTO_APPROVED") return { tone: "ok", text: `Ordered ${num(it.order_quantity)} ${it.unit} · auto-approved` };
-  if (o?.state === "APPROVED") return { tone: "ok", text: `Ordered · approved by ${o.approved_by ?? "a human"}` };
+  if (o?.state === "AUTO_APPROVED") return { tone: "ok", text: `+${num(it.incoming)} ${it.unit} incoming · auto-approved` };
+  if (o?.state === "APPROVED") return { tone: "ok", text: `+${num(it.incoming)} ${it.unit} incoming · approved by ${o.approved_by ?? "a human"}` };
   if (o?.state === "PENDING_HUMAN") return { tone: "warn", text: `Waiting for approval · ${o.rules_fired.map((r) => RULE_LABEL[r] ?? r).join(", ")}` };
   if (o && ["REJECTED", "DENIED", "EXPIRED"].includes(o.state)) return { tone: "bad", text: `${o.state.toLowerCase()} — not coming` };
   if (it.low) return { tone: "bad", text: `Low · needs ${num(it.order_quantity)} ${it.unit}` };
@@ -32,11 +34,13 @@ function status(it: Item): { tone: "ok" | "warn" | "bad" | "accent" | "neutral";
 
 function StockBar({ it }: { it: Item }) {
   const max = Math.max(it.par, it.on_hand) || 1;
-  const incoming = it.order && ["AUTO_APPROVED", "APPROVED"].includes(it.order.state) ? it.order_quantity : 0;
+  const incoming = it.order && DELIVERED.includes(it.order.state) ? it.incoming : 0;
+  const pending = it.order?.state === "PENDING_HUMAN" ? it.incoming : 0;
   return (
     <div className="relative h-2 w-full overflow-hidden rounded-full bg-page ring-1 ring-line">
       <div className={`absolute inset-y-0 left-0 rounded-full ${it.low ? "bg-bad/70" : "bg-ok/70"}`} style={{ width: `${(it.on_hand / max) * 100}%` }} />
-      {incoming > 0 && <div className="absolute inset-y-0 rounded-full bg-ok/25" style={{ left: `${(it.on_hand / max) * 100}%`, width: `${(incoming / max) * 100}%` }} />}
+      {incoming > 0 && <div className="absolute inset-y-0 rounded-full bg-ok/30" style={{ left: `${(it.on_hand / max) * 100}%`, width: `${(Math.min(incoming, max - it.on_hand) / max) * 100}%` }} />}
+      {pending > 0 && <div className="absolute inset-y-0 animate-pulse rounded-full bg-warn/40" style={{ left: `${(it.on_hand / max) * 100}%`, width: `${(Math.min(pending, max - it.on_hand) / max) * 100}%` }} />}
       <div className="absolute inset-y-0 w-0.5 bg-ink/40" style={{ left: `${(it.reorder_point / max) * 100}%` }} title="reorder point" />
     </div>
   );
@@ -47,6 +51,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
   const [events, setEvents] = useState<Ev[]>([]);
   const [running, setRunning] = useState<"claude" | "bot" | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
   const feed = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => { try { setState(await kitchen<State>(org, "state")); } catch { /* agent service restarting */ } }, [org]);
@@ -56,6 +61,17 @@ export function Kitchen({ org }: { org: OrgProfile }) {
   async function service() {
     const r = await kitchen<{ used: string[] }>(org, "service");
     setNote(`Dinner service done: ${r.used.slice(0, 4).join(" · ")}…`);
+    refresh();
+  }
+  async function decide(o: OrderView, verb: "approve" | "reject") {
+    setActing(o.order_id);
+    try {
+      await api(org.approver, `orders/${o.order_id}/${verb}`, { body: verb === "approve" ? {} : { reason: "Rejected from the kitchen" } });
+    } catch (e) { setNote(e instanceof ApiError ? `${e.code}: ${e.message}` : String(e)); } finally { setActing(null); refresh(); }
+  }
+  async function receive() {
+    const r = await kitchen<{ received: string[] }>(org, "receive");
+    setNote(r.received.length ? `Delivery received: ${r.received.join(" · ")}` : "Nothing to receive yet.");
     refresh();
   }
   async function reset() { await kitchen(org, "reset"); setEvents([]); setNote(null); refresh(); }
@@ -80,6 +96,23 @@ export function Kitchen({ org }: { org: OrgProfile }) {
   const waiting = orders.filter((o) => o.state === "PENDING_HUMAN");
   const approved = orders.filter((o) => o.state === "APPROVED").length;
   const cats = [...new Set((state?.items ?? []).map((i) => i.category))];
+  const toReceive = orders.filter((o) => DELIVERED.includes(o.state) && !o.received);
+  const rejected = orders.filter((o) => ["REJECTED", "DENIED", "EXPIRED"].includes(o.state));
+
+  // the workflow, from the agent's own actions in this run, or from the orders already placed
+  const called = (t: string) => events.some((e) => e.type === "tool_call" && e.tool === t);
+  const returned = (t: string) => events.some((e) => e.type === "tool_result" && e.tool === t);
+  const st = (t: string): FlowStep["state"] => (returned(t) || orders.length ? "done" : called(t) ? "active" : "todo");
+  const open = orders.filter((o) => !o.received);
+  const approval: FlowStep["state"] = waiting.length ? "waiting" : rejected.length && open.length ? "blocked" : open.length || orders.length ? "done" : "todo";
+  const steps: FlowStep[] = [
+    { key: "inventory", label: "Inventory", state: st("check_inventory"), detail: "check_inventory" },
+    { key: "request", label: "Request", state: st("create_request"), detail: "one per category" },
+    { key: "lookup", label: "Offer", state: st("lookup"), detail: "signed, fixed price" },
+    { key: "order", label: "Order", state: st("place_order"), detail: orders.length ? `${orders.length} placed` : "place_order" },
+    { key: "approval", label: waiting.length ? "Waiting for approval" : "Approval", state: approval,
+      detail: waiting.length ? `${waiting.length} order${waiting.length > 1 ? "s" : ""} need${waiting.length > 1 ? "" : "s"} a human` : orders.length ? `${auto} / ${orders.length} without a human` : "mandate · human" },
+  ];
 
   return (
     <div className="space-y-5">
@@ -96,6 +129,33 @@ export function Kitchen({ org }: { org: OrgProfile }) {
           <Button variant="ghost" disabled={!!running} onClick={reset}><RotateCcw className="size-4" />Reset</Button>
         </div>
       </Card>
+
+      <Card className={`px-6 py-5 transition ${waiting.length ? "ring-2 ring-warn/50" : ""}`}><FlowTracker steps={steps} /></Card>
+
+      {waiting.map((o) => (
+        <div key={o.order_id} className="animate-in flex flex-wrap items-center gap-4 rounded-xl border-2 border-warn bg-warn-soft px-5 py-4">
+          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-warn text-white"><Hourglass className="size-5 animate-pulse" /></div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold uppercase tracking-wider text-warn">Waiting for approval</div>
+            <div className="font-semibold">{o.category} order · {euro(o.total_net)}</div>
+            <div className="text-sm">{o.items.join(" · ")}</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">{o.rules_fired.map((r) => <Badge key={r} tone="warn">{RULE_LABEL[r] ?? r}</Badge>)}</div>
+            {org.pairing && <div className="mt-1 flex items-center gap-1 text-xs text-muted"><Smartphone className="size-3.5" />Also sent to the approver on Telegram</div>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ok" disabled={acting === o.order_id} onClick={() => decide(o, "approve")}><Check className="size-4" />Approve</Button>
+            <Button variant="bad" disabled={acting === o.order_id} onClick={() => decide(o, "reject")}><X className="size-4" />Reject</Button>
+          </div>
+        </div>
+      ))}
+
+      {toReceive.length > 0 && (
+        <div className="animate-in flex flex-wrap items-center gap-3 rounded-xl border border-ok/30 bg-ok-soft px-5 py-3 text-sm">
+          <Truck className="size-5 text-ok" />
+          <div className="flex-1"><b>{toReceive.length} {toReceive.length > 1 ? "deliveries" : "delivery"} on the way</b> for {toReceive.map((o) => o.category).join(", ")} — arriving Mon 16 Nov.</div>
+          <Button variant="ok" onClick={receive}><PackageCheck className="size-4" />Receive deliveries</Button>
+        </div>
+      )}
 
       {orders.length > 0 && (
         <div className="animate-in grid gap-3 sm:grid-cols-3">
@@ -155,8 +215,8 @@ export function Kitchen({ org }: { org: OrgProfile }) {
           {orders.length > 0 && (
             <div className="space-y-1 border-t border-line px-5 py-3 text-xs">
               {orders.map((o) => (
-                <div key={o.order_id} className="flex items-center gap-2"><span className="font-mono text-muted">{o.order_id}</span><span className="ml-auto">{euro(o.total_net)}</span>
-                  <Badge tone={o.state === "PENDING_HUMAN" ? "warn" : ["AUTO_APPROVED", "APPROVED"].includes(o.state) ? "ok" : "bad"}>{o.state.replaceAll("_", " ").toLowerCase()}</Badge></div>
+                <div key={o.order_id} className="flex items-center gap-2"><span className="font-medium">{o.category}</span><span className="font-mono text-muted">{o.order_id}</span><span className="ml-auto">{euro(o.total_net)}</span>
+                  <Badge tone={o.state === "PENDING_HUMAN" ? "warn" : ["AUTO_APPROVED", "APPROVED"].includes(o.state) ? "ok" : "bad"}>{o.received ? "received" : o.state.replaceAll("_", " ").toLowerCase()}</Badge></div>
               ))}
             </div>
           )}

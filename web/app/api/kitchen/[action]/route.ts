@@ -2,7 +2,7 @@
 import type { NextRequest } from "next/server";
 
 const AGENT = process.env.AGENT_URL ?? "http://localhost:8820";
-const ACTIONS = ["state", "service", "reset"];
+const ACTIONS = ["state", "service", "reset", "receive"];
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ action: string }> }): Promise<Response> {
   const { action } = await ctx.params;

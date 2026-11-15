@@ -1,7 +1,7 @@
 """Deterministic, template-based explanations. Never produced by an LLM."""
 from __future__ import annotations
 
-from ttap.domain.formatting import money
+from ttap.domain.formatting import money, when
 from ttap.domain.models import Offer, Order
 
 RULE_TEXT: dict[str, str] = {
@@ -59,8 +59,9 @@ def explain_offer(offer: Offer) -> str:
     for line in offer.lines:
         good = line.tiers.get("good")
         if good is None:
-            parts.append(f"{line.line_id} : aucun produit éligible ({len(line.excluded)} exclus)")
+            plan = f", plan mixte de {len(line.split)} produit(s)" if line.split else ""
+            parts.append(f"{line.line_id} : aucun produit complet{plan} ({len(line.excluded)} écartés)")
         else:
-            parts.append(f"{line.line_id} : meilleur choix {good.name} à {good.comparison_net} €/unité "
-                         f"de comparaison, {len(line.excluded)} produits exclus")
-    return f"Offre {offer.offer_id} valable jusqu'à {offer.valid_until.isoformat()} — " + " ; ".join(parts)
+            parts.append(f"{line.line_id} : meilleur prix {good.name} à {money(good.comparison_net)} €/unité "
+                         f"de comparaison, {len(line.excluded)} produits écartés")
+    return f"Offre signée valable jusqu'au {when(offer.valid_until)} — " + " ; ".join(parts)

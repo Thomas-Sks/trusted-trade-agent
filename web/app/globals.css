@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-ink: #1e1b3a;
+  --color-muted: #6b6890;
+  --color-canvas: #f6f5ff;
+  --color-grape: #7c5cff;
+  --color-grape-soft: #ece7ff;
+  --color-sky: #2fa8ff;
+  --color-sky-soft: #e3f3ff;
+  --color-bubble: #ff5fa2;
+  --color-bubble-soft: #ffe6f1;
+  --color-sun: #ffb020;
+  --color-sun-soft: #fff3d6;
+  --color-mint: #19c39a;
+  --color-mint-soft: #ddf8ef;
+  --color-tomato: #ff5a4f;
+  --color-tomato-soft: #ffe5e2;
+  --shadow-card: 0 1px 0 rgba(30, 27, 58, 0.04), 0 8px 24px -12px rgba(76, 58, 180, 0.25);
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+  --animate-slide: slide 0.4s ease-out;
+}
+
+@keyframes pop {
+  from { transform: scale(0.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes slide {
+  from { transform: translateY(-6px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+body {
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(rgba(124, 92, 255, 0.16) 1px, transparent 1px);
+  background-size: 18px 18px;
+  color: var(--color-ink);
+}
+
+.card {
+  @apply rounded-3xl bg-white/90 backdrop-blur border border-white shadow-[var(--shadow-card)];
+}
+.btn {
+  @apply inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition
+         active:scale-95 disabled:opacity-40 disabled:pointer-events-none;
+}
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap;
+}
+.scroll-soft::-webkit-scrollbar { width: 8px; }
+.scroll-soft::-webkit-scrollbar-thumb { background: #ddd6ff; border-radius: 999px; }

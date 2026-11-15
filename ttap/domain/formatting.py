@@ -41,3 +41,10 @@ def duration_minutes(minutes: int) -> str:
 
 def shorten(text: str, limit: int = 42) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def when(dt) -> str:
+    """'lun. 16/11 à 08:30' (date or datetime)."""
+    days = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
+    base = f"{days[dt.weekday()]} {dt.day:02d}/{dt.month:02d}"
+    return f"{base} à {dt.hour:02d}:{dt.minute:02d}" if hasattr(dt, "hour") else base

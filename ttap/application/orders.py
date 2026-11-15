@@ -13,6 +13,7 @@ from ttap.application.errors import (
 )
 from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
+from ttap.domain.formatting import money
 from ttap.domain.models import Candidate, Offer, Order, OrderState, SelectedLine, StockStatus
 from ttap.domain.order_response import build_order_response
 from ttap.domain.offer import offer_hash, offer_payload, price_lock_until, resolve_selection
@@ -96,7 +97,7 @@ class OrderService:
         self._auditor.record(
             org_id=org_id, step="order", action="created", subject=f"order/{order.order_id}",
             actor=f"agent:{org_id}", outcome="success",
-            explanation=f"Commande {order.order_id} à prix bloqué {order.total_net} € HT sur l'offre {offer_id}",
+            explanation=f"Commande {order.order_id} à prix bloqué : {money(order.total_net)} € HT (offre {offer_id})",
             data={"offer_id": offer_id, "offer_hash": order.offer_hash,
                   "selected": [s.model_dump() for s in selected], "idempotency_key": idempotency_key})
         mandate = self._mandates.get(org_id)

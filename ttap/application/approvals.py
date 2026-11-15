@@ -6,6 +6,7 @@ from ttap.application.orders import RESERVATION_FOR_STATE, reservation_items
 from ttap.domain.approval_card import build_card
 from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
+from ttap.domain.formatting import money
 from ttap.domain.models import ApprovalCard, Offer, Order, OrderState, SelectedLine
 from ttap.domain.offer import resolve_selection
 from ttap.domain.order_response import build_order_response
@@ -74,7 +75,7 @@ class ApprovalService:
         self._auditor.record(
             org_id=org_id, step="approval", action="approved", subject=f"order/{order_id}",
             actor=f"approver:{approver}", outcome="APPROVED",
-            explanation=f"Commande {order_id} approuvée par {approver} ({order.total_net} € HT)",
+            explanation=f"Commande {order_id} approuvée par {approver} ({money(order.total_net)} € HT)",
             data={"version": done.version})
         return done
 

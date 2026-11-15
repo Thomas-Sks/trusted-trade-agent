@@ -1,9 +1,9 @@
 export type Role = "agent-hotel" | "agent-resto" | "approver-hotel" | "approver-resto" | "admin" | "public";
 export type Org = "hotel" | "resto";
 
-export const ORGS: Record<Org, { label: string; emoji: string; agent: Role; approver: Role; approverName: string; pairing: string }> = {
-  hotel: { label: "Hôtel Aurora", emoji: "🏨", agent: "agent-hotel", approver: "approver-hotel", approverName: "chef_alice", pairing: "PAIR-HOTEL-A" },
-  resto: { label: "Bistro Bruno", emoji: "🍽️", agent: "agent-resto", approver: "approver-resto", approverName: "chef_bruno", pairing: "PAIR-RESTO-B" },
+export const ORGS: Record<Org, { label: string; initials: string; agent: Role; approver: Role; approverName: string; pairing: string; limit: string }> = {
+  hotel: { label: "Aurora Hotel", initials: "AH", agent: "agent-hotel", approver: "approver-hotel", approverName: "chef_alice", pairing: "PAIR-HOTEL-A", limit: "€2,000 / order" },
+  resto: { label: "Bistro Bruno", initials: "BB", agent: "agent-resto", approver: "approver-resto", approverName: "chef_bruno", pairing: "PAIR-RESTO-B", limit: "€800 / order" },
 };
 
 export class ApiError extends Error {
@@ -27,6 +27,9 @@ export async function api<T = unknown>(role: Role, path: string, init?: { method
 }
 
 export const euro = (v: string | number | null | undefined) =>
-  v === null || v === undefined ? "—" : new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(v));
-export const num = (v: string | number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(Number(v));
-export const time = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  v === null || v === undefined ? "—" : new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" }).format(Number(v));
+export const num = (v: string | number) => new Intl.NumberFormat("en-IE", { maximumFractionDigits: 2 }).format(Number(v));
+export const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+export const dateTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });

@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
   caddy:
     image: caddy:2
-    ports: ["80:80", "443:443"]
+    ports: ["80:80", "443:443", "443:443/udp"]
     environment:
       SITE_HOST: ${SITE_HOST}
       BASIC_USER: ${BASIC_USER}

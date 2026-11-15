@@ -10,6 +10,8 @@ order's live state from the gateway, so it works the same whether Claude or the 
 from __future__ import annotations
 
 import copy
+import json
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from decimal import ROUND_CEILING, Decimal
@@ -55,18 +57,23 @@ TEMPLATE = [
 ]
 
 
+DELIVERED = ("AUTO_APPROVED", "APPROVED")
+
+
 @dataclass
 class Kitchen:
     items: list[Item] = field(default_factory=lambda: copy.deepcopy(TEMPLATE))
     services: int = 0
-    request_products: dict[str, list[str]] = field(default_factory=dict)
-    offer_products: dict[str, list[str]] = field(default_factory=dict)
-    item_order: dict[str, str] = field(default_factory=dict)   # product_id -> latest order_id
+    request_lines: dict[str, dict[str, float]] = field(default_factory=dict)   # request_id -> {product_id: qty}
+    offer_lines: dict[str, dict[str, float]] = field(default_factory=dict)     # offer_id -> {product_id: qty}
+    orders: dict[str, dict[str, float]] = field(default_factory=dict)          # order_id -> {product_id: qty}
+    received: list[str] = field(default_factory=list)                          # order_ids already in stock
 
     def reset(self) -> None:
         self.items = copy.deepcopy(TEMPLATE)
         self.services = 0
-        self.request_products.clear(); self.offer_products.clear(); self.item_order.clear()
+        self.request_lines.clear(); self.offer_lines.clear(); self.orders.clear(); self.received.clear()
+        save()
 
     def track(self, event: dict) -> None:
         """Follow request -> offer -> order from tool results; each result names its own ids."""
@@ -74,13 +81,14 @@ class Kitchen:
             return
         r, tool = event["result"], event.get("tool")
         if tool == "create_request" and r.get("request_id"):
-            self.request_products[r["request_id"]] = [ln["need"].get("product_id") for ln in r.get("lines", [])
-                                                      if ln.get("need", {}).get("product_id")]
+            self.request_lines[r["request_id"]] = {
+                ln["need"]["product_id"]: float(ln["quantity"]["value"]) for ln in r.get("lines", [])
+                if ln.get("need", {}).get("product_id") and ln.get("quantity")}
         elif tool == "lookup" and r.get("offer_id") and r.get("request_id"):
-            self.offer_products[r["offer_id"]] = self.request_products.get(r["request_id"], [])
+            self.offer_lines[r["offer_id"]] = self.request_lines.get(r["request_id"], {})
         elif tool == "place_order" and r.get("order_id") and r.get("offer_id"):
-            for pid in self.offer_products.get(r["offer_id"], []):
-                self.item_order[pid] = r["order_id"]
+            self.orders[r["order_id"]] = self.offer_lines.get(r["offer_id"], {})
+        save()
 
     def dinner_service(self) -> list[str]:
         self.services += 1
@@ -89,42 +97,100 @@ class Kitchen:
             take = min(it.on_hand, it.use_per_service)
             it.on_hand = round(it.on_hand - take, 2)
             used.append(f"{it.label}: −{take:g} {it.unit}")
+        save()
         return used
+
+    def receive(self, live_orders: list[dict]) -> list[str]:
+        """Deliveries arrive: approved orders not yet received go into stock."""
+        state = {o["order_id"]: o["state"] for o in live_orders}
+        by_pid = {it.product_id: it for it in self.items}
+        got = []
+        for oid, lines in self.orders.items():
+            if oid in self.received or state.get(oid) not in DELIVERED:
+                continue
+            for pid, qty in lines.items():
+                if pid in by_pid:
+                    by_pid[pid].on_hand = round(by_pid[pid].on_hand + qty, 2)
+                    got.append(f"{by_pid[pid].label}: +{qty:g} {by_pid[pid].unit}")
+            self.received.append(oid)
+        save()
+        return got
 
     def low_items(self) -> list[Item]:
         return [it for it in self.items if it.low()]
 
     def report(self) -> dict:
-        """What an agent sees when it checks the inventory."""
+        """What an agent sees when it checks the inventory. Items already on order are not low any more."""
+        pending = self._open_products()
         return {"delivery_date": DELIVERY.isoformat(),
                 "low": [{"category": it.category, "item": it.label, "product_id": it.product_id,
                          "on_hand": it.on_hand, "reorder_point": it.reorder_point, "par": it.par,
-                         "order_quantity": it.to_order(), "unit": it.unit} for it in self.low_items()],
+                         "order_quantity": it.to_order(), "unit": it.unit}
+                        for it in self.low_items() if it.product_id not in pending],
+                "already_on_order": [it.label for it in self.low_items() if it.product_id in pending],
                 "ok": [f"{it.label}: {it.on_hand:g} {it.unit} ≥ reorder point {it.reorder_point:g}"
                        for it in self.items if not it.low()]}
 
-    def state(self, orders: list[dict]) -> dict:
-        """Inventory with, per item, the order placed for it since the last reset and its live state."""
-        by_id = {o["order_id"]: o for o in orders}
+    def _open_products(self) -> set[str]:
+        return {pid for oid, lines in self.orders.items() if oid not in self.received for pid in lines}
 
-        def view(o: dict) -> dict:
-            return {"order_id": o["order_id"], "state": o["state"], "total_net": o["total_net"],
+    def state(self, live_orders: list[dict]) -> dict:
+        """Inventory with, per item, its open order (if any) and the order's live state at the wholesaler."""
+        by_id = {o["order_id"]: o for o in live_orders}
+        by_pid = {it.product_id: it for it in self.items}
+
+        def view(oid: str) -> dict | None:
+            o = by_id.get(oid)
+            if o is None:
+                return None
+            lines = self.orders[oid]
+            return {"order_id": oid, "state": o["state"], "total_net": o["total_net"],
                     "rules_fired": (o.get("decision") or {}).get("rules_fired", []),
-                    "approved_by": o.get("approved_by")}
-        items = []
-        for it in self.items:
-            o = by_id.get(self.item_order.get(it.product_id, ""))
-            items.append({**asdict(it), "low": it.low(), "order_quantity": it.to_order(),
-                          "order": view(o) if o else None})
-        mine = [by_id[i] for i in dict.fromkeys(self.item_order.values()) if i in by_id]
-        return {"items": items, "services": self.services, "orders": [view(o) for o in mine]}
+                    "approved_by": o.get("approved_by"), "received": oid in self.received,
+                    "category": next((by_pid[p].category for p in lines if p in by_pid), ""),
+                    "items": [f"{by_pid[p].label} {q:g} {by_pid[p].unit}" for p, q in lines.items() if p in by_pid]}
+        open_order: dict[str, str] = {}
+        for oid, lines in self.orders.items():  # insertion order: later orders win
+            if oid not in self.received:
+                for pid in lines:
+                    open_order[pid] = oid
+        items = [{**asdict(it), "low": it.low(), "order_quantity": it.to_order(),
+                  "incoming": self.orders.get(open_order.get(it.product_id, ""), {}).get(it.product_id, 0),
+                  "order": view(open_order[it.product_id]) if it.product_id in open_order else None}
+                 for it in self.items]
+        return {"items": items, "services": self.services,
+                "orders": [v for oid in self.orders if (v := view(oid))]}
 
 
 KITCHENS: dict[str, Kitchen] = {}
+STATE_FILE = os.environ.get("KITCHEN_STATE")  # survives agent-service restarts when set
+
+
+def save() -> None:
+    if not STATE_FILE:
+        return
+    data = {k: {**asdict(v), "items": [asdict(i) for i in v.items]} for k, v in KITCHENS.items()}
+    tmp = f"{STATE_FILE}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, STATE_FILE)
+
+
+def load() -> None:
+    if not STATE_FILE or not os.path.exists(STATE_FILE):
+        return
+    with open(STATE_FILE) as f:
+        for key, v in json.load(f).items():
+            KITCHENS[key] = Kitchen(items=[Item(**i) for i in v["items"]], services=v["services"],
+                                    request_lines=v["request_lines"], offer_lines=v["offer_lines"],
+                                    orders=v["orders"], received=v["received"])
 
 
 def kitchen_for(agent_key: str) -> Kitchen:
     return KITCHENS.setdefault(agent_key, Kitchen())
+
+
+load()
 
 
 async def restock(client: TTAPClient, kitchen: Kitchen, emit) -> None:

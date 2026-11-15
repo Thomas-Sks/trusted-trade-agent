@@ -109,6 +109,12 @@ async def kitchen_service(body: KitchenBody):
     return {"used": kitchen_for(kitchen_key(body)).dinner_service()}
 
 
+@app.post("/kitchen/receive")
+async def kitchen_receive(body: KitchenBody):
+    key = kitchen_key(body)
+    return {"received": kitchen_for(key).receive(await _orders(key))}
+
+
 @app.post("/kitchen/reset")
 async def kitchen_reset(body: KitchenBody):
     kitchen_for(kitchen_key(body)).reset()

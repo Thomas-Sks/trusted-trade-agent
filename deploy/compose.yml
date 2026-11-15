@@ -15,6 +15,9 @@ services:
     env_file: ../.env
     environment:
       TTAP_URL: http://gateway:8811
+      KITCHEN_STATE: /kitchen/state.json
+    volumes:
+      - kitchen-data:/kitchen
     depends_on: [gateway]
     restart: unless-stopped
   web:
@@ -42,4 +45,5 @@ services:
     restart: unless-stopped
 volumes:
   ttap-data:
+  kitchen-data:
   caddy-data:

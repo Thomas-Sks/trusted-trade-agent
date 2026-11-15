@@ -7,9 +7,6 @@
 		Referrer-Policy no-referrer
 		-Server
 	}
-	basic_auth {
-		{$BASIC_USER} {$BASIC_HASH}
-	}
 	reverse_proxy web:3100 {
 		flush_interval -1
 	}

@@ -27,7 +27,8 @@ replenishment bot (no AI) keep working. Each visitor gets 5 agent runs per 10 mi
    would have changed decision". Hit **Pause** → any new order is denied (`mandate_not_active`); Resume.
 4. **Trust & audit (45 s).** Audit log → *Verify chain*: intact, every event signed. Mention offline verification
    with only the public key, and that a tampered line is detected.
-5. **Attack (30 s).** Demo menu → *Prompt injection in catalogue*, then *Lactose-free milk*: the hostile text is shown
+5. **Attack (30 s).** Show `eval/redteam/report.md`: 144 attacks in Finnish, Swedish and English, no filter, zero
+   decision changed — the LLM never decides. Then live: Demo menu → *Prompt injection in catalogue*, then *Lactose-free milk*: the hostile text is shown
    as a product name, but price, quantity and decision are unchanged — the server recomputes everything.
 6. **Openness (15 s).** Same protocol used by a Claude agent over MCP and a no-LLM replenishment bot; conformance kit
    10/10 MUST; spec + OpenAPI + ADRs in the repo.

@@ -64,6 +64,7 @@ length-capped, and the agent only handles purchasing requests.
 | Plug Claude Desktop / Code | MCP stdio server: `python -m buyer_agent.mcp_server` with `TTAP_URL`, `TTAP_AGENT_KEY` |
 | Replenishment bot (no LLM) | `uv run python -m buyer_agent.replenishment_bot --key demo-key-resto-b --once` |
 | Precision eval | `uv run python eval/run_eval.py` → `eval/report.md` |
+| Red team (FI/SV/EN) | `uv run python eval/redteam/run_redteam.py --url http://localhost:8811 [--llm 3]` → `eval/redteam/report.md` (use a scratch gateway) |
 | Conformance kit | `uv run pytest conformance --server-url http://localhost:8811` → `conformance/compatibility.json` |
 | Verify the audit log offline | `uv run python scripts/verify_audit.py audit.jsonl jwk.json` |
 | Unit tests | `uv run pytest` |
@@ -71,6 +72,7 @@ length-capped, and the agent only handles purchasing requests.
 ## Results (live mock API, 2026-11-15)
 - **Evaluation** (16 property-based cases, no LLM, `/orders/preview`): first-time-right 81 % → **100 %** after the full-word relevance fix; decision accuracy **100 %**; touchless rate **100 %** of expected auto-approvals; pass^3 consistency **100 %**; hard-constraint violations **0**. Small, team-written set — a regression guard, not a market claim.
 - **Conformance kit:** 10/10 MUST, 2/2 SHOULD.
+- **Red team** ([`eval/redteam/report.md`](eval/redteam/report.md)): 18 hostile instructions (6 intents × Finnish, Swedish, English) through buyer text, supplier product names, HTTP headers and forged protocol fields — **144 / 144 decisions unchanged, with no input filter**; 126 privilege-escalation attempts with the agent's own key all refused; the real Claude agent reading the payloads still ends in `PENDING_HUMAN`.
 - **Interpreter** (Claude Haiku 5.5): FR/FI/EN free text → constraints in ~3 s, asks before guessing.
 - **What-if:** raising the per-order limit to €5,000 → "3 of 10 past orders would have changed decision".
 - **Tests:** 117 unit/integration tests.

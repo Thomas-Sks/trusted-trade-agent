@@ -22,7 +22,7 @@ with a record both parties can verify.
 | `seller_admin` | admin key | demo controls only (scenarios, clock, reset) |
 | *(public)* | none | self-service onboarding: create an organisation, which returns its agent and approver credentials |
 
-- The organisation MUST be derived from the credential, never from the body; unknown body fields MUST be rejected.
+- The organisation MUST be derived from the credential, never from the body; unknown fields MUST be rejected at every nesting level.
 - Cross-organisation access MUST return `404` (not `403`).
 - An agent MUST NOT be able to modify its own mandate.
 

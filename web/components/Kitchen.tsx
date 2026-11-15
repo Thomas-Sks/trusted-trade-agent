@@ -1,7 +1,8 @@
 "use client";
 import { Bot, BrainCircuit, Check, ChefHat, CircleAlert, Cpu, Hourglass, PackageCheck, RotateCcw, Smartphone, Sparkles, Truck, Utensils, Wrench, X } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, euro, num, type OrgProfile } from "@/lib/api";
+import { api, ApiError, euro, num, presenterHeaders, type OrgProfile } from "@/lib/api";
 import { describeCall, ResultView, type Ev } from "./AgentLive";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL } from "./ui";
@@ -17,7 +18,7 @@ type State = { items: Item[]; services: number; orders: OrderView[] };
 const ident = (org: OrgProfile) => ({ org: org.id, agent_key: typeof org.agent === "string" ? undefined : org.agent.key });
 
 async function kitchen<T>(org: OrgProfile, action: string): Promise<T> {
-  const res = await fetch(`/api/kitchen/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(ident(org)) });
+  const res = await fetch(`/api/kitchen/${action}`, { method: "POST", headers: { "content-type": "application/json", ...presenterHeaders() }, body: JSON.stringify(ident(org)) });
   if (!res.ok) throw new Error(`kitchen ${action}: ${res.status}`);
   return res.json();
 }
@@ -52,9 +53,30 @@ export function Kitchen({ org }: { org: OrgProfile }) {
   const [running, setRunning] = useState<"claude" | "bot" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [paired, setPaired] = useState<boolean | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  useEffect(() => {  // own organisations can pair the approver's phone from here
+    if (typeof org.approver === "string" || !org.telegramLink || paired) return;
+    const cred = org.approver;
+    const check = async () => { try { const s = await api<{ telegram_paired: boolean }>(cred, "onboarding/status"); setPaired(s.telegram_paired); if (s.telegram_paired) setShowQr(false); } catch { /* retry */ } };
+    check(); const id = setInterval(check, 3000); return () => clearInterval(id);
+  }, [org, paired]);
   const feed = useRef<HTMLDivElement>(null);
 
-  const refresh = useCallback(async () => { try { setState(await kitchen<State>(org, "state")); } catch { /* agent service restarting */ } }, [org]);
+  const [decided, setDecided] = useState<{ text: string; ok: boolean } | null>(null);
+  const lastStates = useRef<Record<string, string>>({});
+  const refresh = useCallback(async () => {
+    try {
+      const s = await kitchen<State>(org, "state");
+      for (const o of s.orders) {  // a human decided somewhere else (Telegram, Orders, Approvals): say so here
+        const before = lastStates.current[o.order_id];
+        if (before === "PENDING_HUMAN" && o.state !== "PENDING_HUMAN")
+          setDecided({ ok: o.state === "APPROVED", text: `${o.category} order ${o.state === "APPROVED" ? `approved by ${o.approved_by ?? "a human"}` : o.state.toLowerCase()} · ${euro(o.total_net)}` });
+        lastStates.current[o.order_id] = o.state;
+      }
+      setState(s);
+    } catch { /* agent service restarting */ }
+  }, [org]);
   useEffect(() => { refresh(); const id = setInterval(refresh, 2000); return () => clearInterval(id); }, [refresh]);
   useEffect(() => { feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" }); }, [events]);
 
@@ -79,7 +101,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
   async function restock(mode: "claude" | "bot") {
     setEvents([]); setNote(null); setRunning(mode);
     try {
-      const res = await fetch("/api/agent/kitchen", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...ident(org), mode }) });
+      const res = await fetch("/api/agent/kitchen", { method: "POST", headers: { "content-type": "application/json", ...presenterHeaders() }, body: JSON.stringify({ ...ident(org), mode }) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); setEvents([{ type: "error", text: e.detail ?? `Agent service error (${res.status})` }]); return; }
       const reader = res.body!.getReader(); const decoder = new TextDecoder(); let buf = "";
       for (;;) {
@@ -127,7 +149,19 @@ export function Kitchen({ org }: { org: OrgProfile }) {
           <Button disabled={!!running} onClick={() => restock("claude")}><Sparkles className="size-4" />{running === "claude" ? "Claude is restocking…" : "Restock with Claude"}</Button>
           <Button variant="secondary" disabled={!!running} onClick={() => restock("bot")}><Cpu className="size-4" />{running === "bot" ? "Restocking…" : "Rule-based (no AI)"}</Button>
           <Button variant="ghost" disabled={!!running} onClick={reset}><RotateCcw className="size-4" />Reset</Button>
+          {org.telegramLink && (paired
+            ? <Badge tone="ok" icon={<Smartphone className="size-3.5" />}>Phone paired</Badge>
+            : <Button variant="secondary" onClick={() => setShowQr(!showQr)}><Smartphone className="size-4" />Approve on my phone</Button>)}
         </div>
+        {showQr && org.telegramLink && !paired && (
+          <div className="animate-in flex w-full flex-wrap items-center gap-5 rounded-xl bg-page p-4">
+            <div className="rounded-xl bg-white p-2 ring-1 ring-line"><QRCodeSVG value={org.telegramLink} size={120} fgColor="#17162b" /></div>
+            <div className="max-w-md space-y-2 text-sm">
+              <p>Scan with your phone camera, then press <b>Start</b> in Telegram. Orders that need a human will arrive there as cards with one-tap Approve / Reject.</p>
+              <a href={org.telegramLink} target="_blank" rel="noreferrer"><Button variant="secondary"><Smartphone className="size-4" />Open Telegram</Button></a>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card className={`px-6 py-5 transition ${waiting.length ? "ring-2 ring-warn/50" : ""}`}><FlowTracker steps={steps} /></Card>
@@ -140,7 +174,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
             <div className="font-semibold">{o.category} order · {euro(o.total_net)}</div>
             <div className="text-sm">{o.items.join(" · ")}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">{o.rules_fired.map((r) => <Badge key={r} tone="warn">{RULE_LABEL[r] ?? r}</Badge>)}</div>
-            {org.pairing && <div className="mt-1 flex items-center gap-1 text-xs text-muted"><Smartphone className="size-3.5" />Also sent to the approver on Telegram</div>}
+            {paired && <div className="mt-1 flex items-center gap-1 text-xs text-muted"><Smartphone className="size-3.5" />Also sent to your phone on Telegram</div>}
           </div>
           <div className="flex gap-2">
             <Button variant="ok" disabled={acting === o.order_id} onClick={() => decide(o, "approve")}><Check className="size-4" />Approve</Button>
@@ -148,6 +182,13 @@ export function Kitchen({ org }: { org: OrgProfile }) {
           </div>
         </div>
       ))}
+
+      {decided && (
+        <div className={`animate-in flex items-center gap-3 rounded-xl px-5 py-3 text-sm ${decided.ok ? "bg-ok text-white" : "bg-bad text-white"}`}>
+          {decided.ok ? <Check className="size-5" /> : <X className="size-5" />}<b className="flex-1">{decided.text}</b>
+          <button onClick={() => setDecided(null)} className="text-xs opacity-80 hover:opacity-100">Dismiss</button>
+        </div>
+      )}
 
       {toReceive.length > 0 && (
         <div className="animate-in flex flex-wrap items-center gap-3 rounded-xl border border-ok/30 bg-ok-soft px-5 py-3 text-sm">

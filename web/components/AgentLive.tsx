@@ -1,7 +1,7 @@
 "use client";
 import { Bot, BrainCircuit, CheckCircle2, CircleAlert, Cpu, Play, Plug, Radio, Sparkles, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {api, euro, num, type OrgProfile } from "@/lib/api";
+import { api, euro, num, presenterHeaders, type OrgProfile } from "@/lib/api";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
@@ -130,7 +130,7 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
   async function run(kind: "claude" | "bot") {
     setEvents([]); setDecision(null); setRunning(kind);
     try {
-      const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org: org.id, text, agent_key: typeof org.agent === "string" ? undefined : org.agent.key }) });
+      const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json", ...presenterHeaders() }, body: JSON.stringify({ org: org.id, text, agent_key: typeof org.agent === "string" ? undefined : org.agent.key }) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setEvents([{ type: "error", text: err.detail ?? `Agent service error (${res.status})` }]);

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from ttap.application.auditing import Auditor
-from ttap.application.errors import Conflict, InvalidSelection, NotFound, PriceLockExpired
+from ttap.application.errors import Conflict, InvalidSelection, NotFound, PriceLockExpired, StockChanged
+from ttap.application.orders import RESERVATION_FOR_STATE, reservation_items
 from ttap.domain.approval_card import build_card
 from ttap.domain.decision import build_decision_context
 from ttap.domain.explain import explain_decision
@@ -46,6 +47,7 @@ class ApprovalService:
         after = after.model_copy(update={"order_response": build_order_response(after, self._offer(after))})
         if not self._store.transition(before.org_id, before.order_id, before.state, before.version, after):
             raise Conflict(f"order {before.order_id} changed concurrently")
+        self._store.set_reservation_status(after.order_id, RESERVATION_FOR_STATE.get(after.state, "HELD"))
         return after
 
     def card(self, org_id: str, order_id: str) -> ApprovalCard:
@@ -99,6 +101,12 @@ class ApprovalService:
         except KeyError as exc:
             raise InvalidSelection(f"unknown line or tier: {exc}") from exc
         now = self._clock.now()
+        self._store.set_reservation_status(order_id, "RELEASED")
+        short = self._store.reserve(org_id, order_id, reservation_items(candidates))
+        if short:
+            self._store.reserve(org_id, order_id, reservation_items(resolve_selection(self._offer(order),
+                                                                                    order.selected)))
+            raise StockChanged(f"stock no longer available for {', '.join(short)}")
         decision = self._policy.decide(build_decision_context(candidates, self._mandates.get(org_id), now))
         state = MODIFY_OUTCOME[decision.outcome]
         done = self._commit(order, order.model_copy(update={
@@ -121,6 +129,7 @@ class ApprovalService:
             after = order.model_copy(update={"state": OrderState.EXPIRED, "version": order.version + 1})
             after = after.model_copy(update={"order_response": build_order_response(after, self._offer(after))})
             if self._store.transition(order.org_id, order.order_id, order.state, order.version, after):
+                self._store.set_reservation_status(order.order_id, "RELEASED")
                 self._auditor.record(
                     org_id=order.org_id, step="approval", action="expired", subject=f"order/{order.order_id}",
                     actor="system", outcome="EXPIRED",

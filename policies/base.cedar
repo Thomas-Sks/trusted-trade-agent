@@ -24,3 +24,11 @@ when { context.has_changes_vs_request };
 @id("partial_fulfilment")
 forbid (principal, action == Action::"auto_approve", resource)
 when { context.has_partial };
+
+@id("period_budget_exceeded")
+forbid (principal, action == Action::"auto_approve", resource)
+when { context.period_spend_net.greaterThan(context.period_budget_net) };
+
+@id("order_velocity_exceeded")
+forbid (principal, action == Action::"auto_approve", resource)
+when { context.orders_last_hour > context.max_orders_per_hour };

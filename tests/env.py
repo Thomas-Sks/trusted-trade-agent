@@ -21,15 +21,18 @@ POLICIES = Path(__file__).resolve().parent.parent / "policies" / "base.cedar"
 
 
 class Env:
-    def __init__(self, limit: str = "2000"):
+    def __init__(self, limit: str = "2000", stock_amount: str = "9999999999", budget: str | None = None,
+                 max_per_hour: int | None = None):
         self.clock = FixedClock(DEMO_NOW)
         self.store = SqliteStore()
         self.signer = EcdsaSigner()
         catalog = JsonCatalog([product("M1", "Lactose free milk 1 l", claims=("FREE_FROM_LACTOSE",))], "sha256:t")
-        gateway = FakeGateway({"M1": price("M1", "1.01", "1.01")}, {"M1": stock("M1", "9999999999")})
-        mandates = InMemoryMandates({"org_a": Mandate(
-            org_id="org_a", version=1, valid_until=DEMO_NOW + timedelta(days=30),
-            limit_per_order_net=Decimal(limit), max_unverified_value_net=Decimal("500"))})
+        gateway = FakeGateway({"M1": price("M1", "1.01", "1.01")}, {"M1": stock("M1", stock_amount)})
+        mandates = InMemoryMandates({org: Mandate(
+            org_id=org, version=1, valid_until=DEMO_NOW + timedelta(days=30),
+            limit_per_order_net=Decimal(limit), max_unverified_value_net=Decimal("500"),
+            period_budget_net=Decimal(budget) if budget else None, max_orders_per_hour=max_per_hour)
+            for org in ("org_a", "org_b")})
         counter = iter(range(1, 10_000))
         new_id = lambda prefix: f"{prefix}_{next(counter)}"  # noqa: E731
         self.mandates = mandates

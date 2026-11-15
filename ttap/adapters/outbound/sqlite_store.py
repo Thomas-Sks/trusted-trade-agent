@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from ttap.domain.models import ActionToken, ApproverRef, Offer, Order, OrderState, PurchaseRequest
 
@@ -14,6 +15,8 @@ CREATE TABLE IF NOT EXISTS offers (org_id TEXT NOT NULL, id TEXT NOT NULL, body 
 CREATE TABLE IF NOT EXISTS orders (org_id TEXT NOT NULL, id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
   state TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL,
   PRIMARY KEY (org_id, id), UNIQUE (org_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS reservations (order_id TEXT NOT NULL, org_id TEXT NOT NULL, product_id TEXT NOT NULL,
+  delivery_date TEXT NOT NULL, qty TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY (order_id, product_id));
 CREATE TABLE IF NOT EXISTS approver_links (telegram_id INTEGER PRIMARY KEY, org_id TEXT NOT NULL,
   user_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS action_tokens (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, order_id TEXT NOT NULL,
@@ -117,3 +120,44 @@ class SqliteStore:
 
     def consume_action_token(self, token_id: str) -> bool:
         return self._write("UPDATE action_tokens SET used = 1 WHERE id = ? AND used = 0", (token_id,)) == 1
+
+    # --- reservations (available-to-promise ledger) -------------------------------------------------------
+    def _reserved_locked(self, product_id: str, delivery: str) -> Decimal:
+        rows = self._db.execute("SELECT qty FROM reservations WHERE product_id = ? AND delivery_date = ? "
+                                "AND status IN ('HELD', 'FIRM')", (product_id, delivery)).fetchall()
+        return sum((Decimal(r[0]) for r in rows), Decimal("0"))
+
+    def reserved_qty(self, product_ids: list[str], delivery: date) -> dict[str, Decimal]:
+        with self._lock:
+            return {pid: self._reserved_locked(pid, delivery.isoformat()) for pid in product_ids}
+
+    def reserve(self, org_id: str, order_id: str,
+                items: list[tuple[str, date, Decimal, Decimal]]) -> list[str]:
+        """All-or-nothing: items = (product_id, delivery_date, qty, upstream_available). Returns shortages."""
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                short = [pid for pid, day, qty, upstream in items
+                         if upstream - self._reserved_locked(pid, day.isoformat()) < qty]
+                if short:
+                    self._db.execute("ROLLBACK")
+                    return short
+                for pid, day, qty, _ in items:
+                    self._db.execute("INSERT OR REPLACE INTO reservations VALUES (?, ?, ?, ?, ?, 'HELD')",
+                                     (order_id, org_id, pid, day.isoformat(), str(qty)))
+                self._db.execute("COMMIT")
+                return []
+            except Exception:
+                self._db.execute("ROLLBACK")
+                raise
+
+    def set_reservation_status(self, order_id: str, status: str) -> None:
+        self._write("UPDATE reservations SET status = ? WHERE order_id = ?", (status, order_id))
+
+    def org_orders_since(self, org_id: str, since: datetime, states: tuple[OrderState, ...]) -> list[Order]:
+        marks = ",".join("?" for _ in states)
+        with self._lock:
+            rows = self._db.execute(f"SELECT body FROM orders WHERE org_id = ? AND state IN ({marks})",
+                                    (org_id, *[s.value for s in states])).fetchall()
+        orders = [Order.model_validate_json(r[0]) for r in rows]
+        return [o for o in orders if o.decided_at is not None and o.decided_at >= since]

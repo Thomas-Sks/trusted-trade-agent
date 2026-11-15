@@ -11,6 +11,9 @@ RULE_TEXT: dict[str, str] = {
     "origin_conflict": "Origine contradictoire entre Valio et le fabricant",
     "deviates_from_request": "Le choix s'écarte de la demande (substitut, origine ou marque)",
     "partial_fulfilment": "Disponibilité partielle : quantité demandée non couverte par le produit demandé",
+    "period_budget_exceeded": "Budget de la période dépassé : {period_spend_net} € engagés > {period_budget_net} €",
+    "order_velocity_exceeded": (
+        "Rythme anormal : {orders_last_hour} commandes dans l'heure > {max_orders_per_hour} (fractionnement ?)"),
     "mandate_not_active": "Mandat inactif, suspendu ou expiré",
     "policy_evaluation_error": "Erreur d'évaluation des règles : refus par défaut",
 }

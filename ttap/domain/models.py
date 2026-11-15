@@ -119,6 +119,7 @@ class UpstreamAvailability(BaseModel):
     available_date: date | None = None
     sales_unit: str | None = None
     closing_time: datetime | None = None
+    reserved: Decimal = Decimal("0")  # already promised by this gateway (available_amount is net of it)
 
 
 Tier = Literal["good", "better", "best", "split"]
@@ -151,6 +152,7 @@ class Candidate(BaseModel):
     partial: bool = False
     missing_qty: Decimal = Decimal("0")
     lot_size: Decimal = Decimal("1")
+    upstream_available: Decimal | None = None
 
 
 class Exclusion(BaseModel):
@@ -249,6 +251,9 @@ class Mandate(BaseModel):
     limit_per_order_net: Decimal
     max_unverified_value_net: Decimal
     approval_timeout: timedelta = timedelta(hours=2)
+    period_budget_net: Decimal | None = None
+    period_window: timedelta = timedelta(days=7)
+    max_orders_per_hour: int | None = None
     step_up_above_net: Decimal = Decimal("5000")
     usual_list: list[UsualItem] = []
 

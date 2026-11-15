@@ -37,3 +37,7 @@ class Conflict(TTAPError):
 
 class PriceLockExpired(TTAPError):
     code, status = "PRICE_LOCK_EXPIRED", 409
+
+
+class StockChanged(TTAPError):
+    code, status = "STOCK_CHANGED", 409

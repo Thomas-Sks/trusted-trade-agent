@@ -21,6 +21,7 @@ from ttap.application.errors import TTAPError
 from ttap.application.interpret import InterpretService
 from ttap.application.lookup import LookupService
 from ttap.application.mandates import MandateChanges, MandateService
+from ttap.application.onboarding import NewOrganisation, OnboardingService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
 from ttap.domain.audit_verify import verify_chain
@@ -54,6 +55,7 @@ class Services:
     demo: DemoControls | None = None
     interpret: InterpretService | None = None
     mandates: MandateService | None = None
+    onboarding: OnboardingService | None = None
 
 
 class InterpretBody(BaseModel):
@@ -103,7 +105,8 @@ def create_app(services: Services, agent_keys: dict[str, str],
                approver_keys: dict[str, tuple[str, str]] | None = None,
                lifecycle: Lifecycle | None = None, expiry_interval_s: float = 30.0,
                admin_key: str | None = None) -> FastAPI:
-    approver_keys = approver_keys or {}
+    if approver_keys is None:  # keep the caller's dict: onboarding mutates it live
+        approver_keys = {}
 
     async def _expiry_loop() -> None:
         while True:
@@ -129,7 +132,8 @@ def create_app(services: Services, agent_keys: dict[str, str],
     app = FastAPI(title="Trusted Trade Agent Protocol", version=PROTOCOL_VERSION, lifespan=lifespan)
     trace: deque[dict] = deque(maxlen=1000)
     seq = count(1)
-    key_owner = {k: v for k, v in agent_keys.items()} | {k: v[0] for k, v in approver_keys.items()}
+    def key_owner(token: str) -> str | None:  # registries are live: onboarded organisations appear immediately
+        return agent_keys.get(token) or (approver_keys.get(token) or (None,))[0]
 
     @app.middleware("http")
     async def wire_trace(request: Request, call_next):
@@ -141,7 +145,7 @@ def create_app(services: Services, agent_keys: dict[str, str],
             token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
             trace.append({"id": next(seq), "time": time.time(), "method": request.method, "path": path,
                           "status": response.status_code, "ms": round((time.perf_counter() - started) * 1000),
-                          "org": key_owner.get(token), "via": request.headers.get("x-ttap-via", "rest")})
+                          "org": key_owner(token), "via": request.headers.get("x-ttap-via", "rest")})
         return response
 
     @app.exception_handler(TTAPError)
@@ -303,6 +307,17 @@ def create_app(services: Services, agent_keys: dict[str, str],
         events = services.auditor.log.list(org)
         problems = verify_chain(events, services.signer.public_jwk(), EcdsaSigner.verify_with_jwk)
         return {"org_id": org, "events": len(events), "valid": not problems, "problems": problems}
+
+    @app.post("/onboarding/organisations", status_code=201)
+    def onboard(body: NewOrganisation) -> dict:
+        """Demo self-service: create an organisation, its mandate, credentials and a Telegram pairing link."""
+        if services.onboarding is None:
+            raise Unauthorized("onboarding disabled")
+        return services.onboarding.create(body)
+
+    @app.get("/onboarding/status")
+    def onboarding_status(who: tuple[str, str] = Depends(approver)) -> dict:
+        return services.onboarding.status(who[0])
 
     @app.get("/trace")
     def wire(after: int = 0, org: str = Depends(any_org)) -> list[dict]:

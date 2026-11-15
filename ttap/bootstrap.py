@@ -26,6 +26,7 @@ from ttap.application.interpret import InterpretService
 from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.mandates import MandateService
+from ttap.application.onboarding import OnboardingService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
 from ttap.domain.models import Mandate, UsualItem
@@ -135,12 +136,15 @@ def build_live() -> LiveApp:
                               notifier=telegram, simulated=lambda: scenario.scenario.active(),
                               interpreter=_interpreter())
     services.demo = DemoControls(scenario=scenario, cache=gateway, clock=clock, store=store)
+    pairing = parse_approver_entries(os.environ.get(
+        "APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice,PAIR-RESTO-B:org_resto_b:chef_bruno"))
     if telegram:
         from ttap.adapters.inbound.telegram_logic import ApprovalBotLogic
-        pairing = parse_approver_entries(os.environ.get(
-            "APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice,PAIR-RESTO-B:org_resto_b:chef_bruno"))
         telegram.bind(ApprovalBotLogic(store, services.approvals, pairing, clock,
                                        web_base_url=os.environ.get("TTAP_PUBLIC_URL"), mandates=services.mandates))
     keys = parse_agent_keys(os.environ.get("AGENT_KEYS", "demo-key-hotel-a:org_hotel_a,demo-key-resto-b:org_resto_b"))
     approvers = parse_approver_entries(os.environ.get("APPROVER_KEYS", "approver-key-hotel-a:org_hotel_a:chef_alice,approver-key-resto-b:org_resto_b:chef_bruno"))
+    services.onboarding = OnboardingService(store, services.mandates._mandates, clock, services.auditor, keys, approvers,
+                                            pairing, telegram_bot=os.environ.get("TELEGRAM_BOT_USERNAME"))
+    services.onboarding.load_all()
     return LiveApp(services, keys, approvers, telegram, os.environ.get("ADMIN_KEY", "admin-key-valio"))

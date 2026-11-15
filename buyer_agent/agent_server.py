@@ -28,6 +28,11 @@ app = FastAPI(title="TTAP buyer agents")
 class RunBody(BaseModel):
     org: str = "hotel"
     text: str = ""
+    agent_key: str | None = None  # organisations onboarded in the console bring their own key
+
+
+def key_for(body: RunBody) -> str:
+    return body.agent_key or KEYS.get(body.org, KEYS["hotel"])
 
 
 def ndjson(stream):
@@ -39,14 +44,14 @@ def ndjson(stream):
 
 @app.post("/run/claude")
 async def run_claude(body: RunBody):
-    return ndjson(run_events(body.text, KEYS[body.org], GATEWAY))
+    return ndjson(run_events(body.text, key_for(body), GATEWAY))
 
 
 @app.post("/run/bot")
 async def run_bot(body: RunBody):
     async def stream():
         queue: asyncio.Queue = asyncio.Queue()
-        client = TTAPClient(GATEWAY, KEYS[body.org], via="rest:replenishment-bot")
+        client = TTAPClient(GATEWAY, key_for(body), via="rest:replenishment-bot")
 
         async def drive():
             try:

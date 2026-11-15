@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS orders (org_id TEXT NOT NULL, id TEXT NOT NULL, idemp
   PRIMARY KEY (org_id, id), UNIQUE (org_id, idempotency_key));
 CREATE TABLE IF NOT EXISTS reservations (order_id TEXT NOT NULL, org_id TEXT NOT NULL, product_id TEXT NOT NULL,
   delivery_date TEXT NOT NULL, qty TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY (order_id, product_id));
+CREATE TABLE IF NOT EXISTS organisations (org_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS approver_links (telegram_id INTEGER PRIMARY KEY, org_id TEXT NOT NULL,
   user_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS action_tokens (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, order_id TEXT NOT NULL,
@@ -174,3 +175,13 @@ class SqliteStore:
         with self._lock:
             for table in ("requests", "offers", "orders", "reservations", "action_tokens"):
                 self._db.execute(f"DELETE FROM {table}")
+
+    def save_organisation(self, org_id: str, body: str) -> None:
+        self._write("INSERT OR REPLACE INTO organisations (org_id, body) VALUES (?, ?)", (org_id, body))
+
+    def list_organisations(self) -> list[str]:
+        with self._lock:
+            return [r[0] for r in self._db.execute("SELECT body FROM organisations").fetchall()]
+
+    def count_organisations(self) -> int:
+        return self._one("SELECT COUNT(*) FROM organisations", ())[0]

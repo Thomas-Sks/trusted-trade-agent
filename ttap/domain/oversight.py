@@ -39,7 +39,7 @@ def oversight_stats(events: list[AuditEvent]) -> OversightStats:
     else:
         summary = f"{fast:.0f}% of approvals were given in under 5 s (median {median(latencies):.1f} s)"
         if risk:
-            summary += " — possible rubber-stamping"
+            summary += " (possible rubber-stamping)"
     return OversightStats(human_decisions=approved + rejected, approved=approved, rejected=rejected,
                           median_seconds=round(median(latencies), 1) if latencies else None,
                           approved_under_5s_pct=round(fast, 1) if fast is not None else None,

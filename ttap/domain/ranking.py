@@ -18,7 +18,7 @@ NO_CARBON = Decimal("1e9")
 
 
 def best_key(c: Candidate) -> tuple:
-    """Quality first (labels, stock certainty, delivery reliability, lower carbon), then price — all generic."""
+    """Quality first (labels, stock certainty, delivery reliability, lower carbon), then price, all generic."""
     reliability = c.reliability if c.reliability is not None else DEFAULT_RELIABILITY
     carbon = c.carbon_kg_per_kg if c.carbon_kg_per_kg is not None else NO_CARBON
     return (-c.score, -reliability, carbon, c.comparison_net, c.product_id)

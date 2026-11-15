@@ -69,7 +69,7 @@ export async function api<T = unknown>(who: Cred, path: string, init?: { method?
 }
 
 export const euro = (v: string | number | null | undefined) =>
-  v === null || v === undefined ? "—" : new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" }).format(Number(v));
+  v === null || v === undefined ? "n/a" : new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" }).format(Number(v));
 export const num = (v: string | number) => new Intl.NumberFormat("en-IE", { maximumFractionDigits: 2 }).format(Number(v));
 export const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 

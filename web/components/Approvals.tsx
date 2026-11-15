@@ -9,7 +9,7 @@ import { Badge, Button, Card, Empty } from "./ui";
 const BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT;
 
 function cutoff(min: number | null) {
-  if (min === null) return "—";
+  if (min === null) return "n/a";
   if (min < 0) return "passed";
   const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
   return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
@@ -70,7 +70,7 @@ export function Approvals({ org, onCount }: { org: OrgProfile; onCount: (n: numb
             <Gauge className={`mt-0.5 size-5 shrink-0 ${stats.rubber_stamp_risk ? "text-warn" : "text-muted"}`} />
             <div className="text-xs text-muted">
               <div className="mb-0.5 text-sm font-semibold text-ink">Oversight quality</div>
-              {stats.summary}. Approving in seconds usually means not reading — the card shows facts, never the agent&apos;s advocacy.
+              {stats.summary}. Approving in seconds usually means not reading. The card shows facts, never the agent&apos;s advocacy.
             </div>
           </Card>
         )}
@@ -125,7 +125,7 @@ export function Approvals({ org, onCount }: { org: OrgProfile; onCount: (n: numb
               <section className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">{current.card.warnings.map((w) => <div key={w}>{w}</div>)}</section>
             )}
             <dl className="grid grid-cols-3 gap-4 text-sm">
-              <div><dt className="text-xs text-muted">Delivery</dt><dd className="font-medium">{current.card.delivery_date ? dateTime(current.card.delivery_date).split(",")[0] : "—"}</dd></div>
+              <div><dt className="text-xs text-muted">Delivery</dt><dd className="font-medium">{current.card.delivery_date ? dateTime(current.card.delivery_date).split(",")[0] : "n/a"}</dd></div>
               <div><dt className="text-xs text-muted">Order cut-off in</dt><dd className="font-medium">{cutoff(current.card.minutes_to_cutoff)}</dd></div>
               <div><dt className="text-xs text-muted">Signed offer</dt><dd className="font-mono text-xs">{current.card.offer_hash_short}</dd></div>
             </dl>

@@ -233,7 +233,7 @@ async def restock(client: TTAPClient, kitchen: Kitchen, emit) -> None:
         except OfferNotTrusted as exc:
             await emit({"type": "error", "text": f"{cat}: offer rejected, signature does not verify ({exc})"})
         except TTAPError as exc:
-            await emit({"type": "error", "text": f"{cat}: {exc.code} — {exc.body.get('detail')}"})
+            await emit({"type": "error", "text": f"{cat}: {exc.code}: {exc.body.get('detail')}"})
     auto = sum(1 for _, o in outcomes if o["state"] == "AUTO_APPROVED")
     summary = "; ".join(f"{c} €{o['total_net']} → {o['state'].replace('_', ' ').lower()}"
                         + (f" ({', '.join(o['decision']['rules_fired'])})" if o.get("decision") and

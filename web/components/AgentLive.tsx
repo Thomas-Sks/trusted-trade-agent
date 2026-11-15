@@ -38,7 +38,7 @@ export function ResultView({ tool, result }: { tool: string; result: unknown }) 
   if (r && typeof r === "object" && "error" in r) return <Badge tone="bad">{String(r.error)}: {String(r.detail ?? "")}</Badge>;
   if (tool === "interpret_request") {
     const a = (r.assumptions as string[]) ?? [];
-    return <div className="text-xs text-muted">Structured request · {a.length} assumption{a.length !== 1 ? "s" : ""}{a[0] ? ` — e.g. “${a[0]}”` : ""}</div>;
+    return <div className="text-xs text-muted">Structured request · {a.length} assumption{a.length !== 1 ? "s" : ""}{a[0] ? `, e.g. “${a[0]}”` : ""}</div>;
   }
   if (tool === "check_inventory") {
     const low = (r.low as { item: string; on_hand: number; reorder_point: number; order_quantity: number; unit: string }[]) ?? [];
@@ -239,7 +239,7 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
               if (e.type === "text") return <div key={i} className="animate-in whitespace-pre-wrap rounded-lg bg-white px-3 py-2.5 text-sm ring-1 ring-line">{e.text}</div>;
               return null;
             })}
-            {pendingId && <div className="animate-in flex items-center gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><span className="size-2 animate-ping rounded-full bg-warn" />Waiting for a human decision — approve on the phone or in the Approvals tab.</div>}
+            {pendingId && <div className="animate-in flex items-center gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><span className="size-2 animate-ping rounded-full bg-warn" />Waiting for a human decision: approve on the phone or in the Approvals tab.</div>}
             {decision && (
               <div className={`animate-in flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${decision.state === "APPROVED" ? "bg-ok-soft text-ok" : "bg-bad-soft text-bad"}`}>
                 {decision.state === "APPROVED" ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}

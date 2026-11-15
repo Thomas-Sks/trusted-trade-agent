@@ -62,4 +62,4 @@ def explain_offer(offer: Offer) -> str:
         else:
             parts.append(f"{line.line_id}: best price {good.name} at €{money(good.comparison_net)} per comparison "
                          f"unit, {len(line.excluded)} products excluded")
-    return f"Signed offer valid until {when(offer.valid_until)} — " + "; ".join(parts)
+    return f"Signed offer valid until {when(offer.valid_until)}: " + "; ".join(parts)

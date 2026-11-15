@@ -65,7 +65,7 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Let an agent buy for you — safely</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Let an agent buy for you, safely</h1>
         <p className="mt-1 text-sm text-muted">Set up your organisation in one minute. Your agent will buy from Valio Aimo within the limits you set, and ask you on your phone when it must not decide alone.</p>
       </div>
       <Card className="p-6"><Steps step={step} /></Card>
@@ -86,7 +86,7 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
       {step === 1 && (
         <Card className="animate-in space-y-4 p-6">
           <div className="flex items-center gap-2 font-semibold"><Scale className="size-5 text-accent" />Your agent&apos;s mandate</div>
-          <p className="text-sm text-muted">These limits are enforced by the wholesaler&apos;s policy engine — the agent cannot talk its way around them.</p>
+          <p className="text-sm text-muted">These limits are enforced by the wholesaler&apos;s policy engine: the agent cannot talk its way around them.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             {LIMITS.map((l) => (
               <label key={l.key} className="block">
@@ -114,7 +114,7 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
           <div className="grid gap-3 sm:grid-cols-2">
             {[
               { on: true, title: "On my phone (Telegram)", hint: "Approval cards with signed one-tap buttons", disabled: !created.telegram_link },
-              { on: false, title: "In the web console only", hint: "No phone needed — use the Approvals tab", disabled: false },
+              { on: false, title: "In the web console only", hint: "No phone needed: use the Approvals tab", disabled: false },
             ].map((o) => (
               <button key={o.title} disabled={o.disabled} onClick={() => setUseTelegram(o.on)}
                 className={`rounded-xl border px-4 py-3 text-left transition disabled:opacity-40 ${useTelegram === o.on ? "border-accent bg-accent-soft/40 ring-4 ring-accent/10" : "border-line hover:border-accent/50"}`}>
@@ -130,7 +130,7 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
                 <p>Scan with your phone camera (or tap the button on mobile), then press <b>Start</b> in Telegram. Approval requests will arrive there with one-time signed buttons.</p>
                 <a href={created.telegram_link} target="_blank" rel="noreferrer"><Button variant="secondary"><Smartphone className="size-4" />Open Telegram</Button></a>
                 <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${paired ? "bg-ok-soft text-ok" : "bg-page text-muted"}`}>
-                  {paired ? <><Check className="size-4" /><b>Phone paired</b> — you will be asked here when needed.</> : <><Loader2 className="size-4 animate-spin" />Waiting for your phone… (you can also continue and pair later)</>}
+                  {paired ? <><Check className="size-4" /><b>Phone paired</b>: you will be asked here when needed.</> : <><Loader2 className="size-4 animate-spin" />Waiting for your phone… (you can also continue and pair later)</>}
                 </div>
               </div>
             </div>

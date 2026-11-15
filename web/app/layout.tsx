@@ -7,7 +7,7 @@ const mono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TTAP Console",
-  description: "Trusted Trade Agent Protocol — open, verifiable agent purchasing for Valio Aimo",
+  description: "Trusted Trade Agent Protocol: open, verifiable agent purchasing for Valio Aimo",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

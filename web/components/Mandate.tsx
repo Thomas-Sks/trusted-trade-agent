@@ -48,7 +48,7 @@ export function Mandate({ org }: { org: OrgProfile }) {
         <div className="flex items-center gap-2">
           <Scale className="size-5 text-accent" />
           <div><div className="font-semibold">Mandate of {org.label}</div>
-            <div className="text-xs text-muted">Version {current?.version ?? "—"} · enforced by Cedar policies</div></div>
+            <div className="text-xs text-muted">Version {current?.version ?? "n/a"} · enforced by Cedar policies</div></div>
         </div>
         {current && (
           <div className={`flex items-center justify-between rounded-lg px-3 py-2.5 ${current.status === "active" ? "bg-ok-soft" : "bg-bad-soft"}`}>

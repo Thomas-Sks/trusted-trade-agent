@@ -1,4 +1,4 @@
-"""Approval card: raw facts, triggered rules and deviation from usual behaviour — no LLM advocacy."""
+"""Approval card: raw facts, triggered rules and deviation from usual behaviour, no LLM advocacy."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -72,19 +72,19 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
 
 
 def render_card_text(card: ApprovalCard) -> str:
-    rows = [f"🟠 Approval required — {card.org_id} · order {card.order_id} · offer {card.offer_hash_short}",
+    rows = [f"🟠 Approval required · {card.org_id} · order {card.order_id} · offer {card.offer_hash_short}",
             "Blocked by:"]
     rows += [f" • {r}" for r in card.reasons] or [" • (no rule)"]
     rows.append("Lines:")
     for line in card.lines:
         extra = [x for x in (line.vs_usual, *line.changes) if x]
-        rows.append(f" • {line.qty_sales_units} {line.sales_unit} {line.name} — €{line.line_total_net} excl. VAT"
+        rows.append(f" • {line.qty_sales_units} {line.sales_unit} {line.name}: €{line.line_total_net} excl. VAT"
                     + (f" ({', '.join(extra)})" if extra else ""))
     if card.warnings:
         rows.append("Warnings: " + " · ".join(card.warnings))
     rows.append(f"Total €{card.total_net} excl. VAT / €{card.total_gross} incl. VAT")
     if card.delivery_date:
-        cutoff = f" — order cut-off in {card.minutes_to_cutoff} min" if card.minutes_to_cutoff is not None else ""
+        cutoff = f" · order cut-off in {card.minutes_to_cutoff} min" if card.minutes_to_cutoff is not None else ""
         rows.append(f"Delivery {card.delivery_date.isoformat()}{cutoff}")
     if card.step_up_required:
         rows.append("🔐 High amount: approve on the web console only")

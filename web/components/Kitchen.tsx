@@ -28,7 +28,7 @@ function status(it: Item): { tone: "ok" | "warn" | "bad" | "accent" | "neutral";
   if (o?.state === "AUTO_APPROVED") return { tone: "ok", text: `+${num(it.incoming)} ${it.unit} incoming · auto-approved` };
   if (o?.state === "APPROVED") return { tone: "ok", text: `+${num(it.incoming)} ${it.unit} incoming · approved by ${o.approved_by ?? "a human"}` };
   if (o?.state === "PENDING_HUMAN") return { tone: "warn", text: `Waiting for approval · ${o.rules_fired.map((r) => RULE_LABEL[r] ?? r).join(", ")}` };
-  if (o && ["REJECTED", "DENIED", "EXPIRED"].includes(o.state)) return { tone: "bad", text: `${o.state.toLowerCase()} — not coming` };
+  if (o && ["REJECTED", "DENIED", "EXPIRED"].includes(o.state)) return { tone: "bad", text: `${o.state.toLowerCase()}, not coming` };
   if (it.low) return { tone: "bad", text: `Low · needs ${num(it.order_quantity)} ${it.unit}` };
   return { tone: "neutral", text: "OK" };
 }
@@ -141,7 +141,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
       <Card className="flex flex-wrap items-center gap-4 px-6 py-5">
         <div className="grid size-11 place-items-center rounded-xl bg-accent-soft text-accent"><ChefHat className="size-6" /></div>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold">{org.label.replace(" (demo)", "")} — kitchen</div>
+          <div className="font-semibold">{org.label.replace(" (demo)", "")} · kitchen</div>
           <div className="text-sm text-muted">The inventory belongs to the restaurant. Its agent restocks what runs low; Valio&apos;s mandate engine decides every order, and only the exceptions reach a human.</div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -193,7 +193,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
       {toReceive.length > 0 && (
         <div className="animate-in flex flex-wrap items-center gap-3 rounded-xl border border-ok/30 bg-ok-soft px-5 py-3 text-sm">
           <Truck className="size-5 text-ok" />
-          <div className="flex-1"><b>{toReceive.length} {toReceive.length > 1 ? "deliveries" : "delivery"} on the way</b> for {toReceive.map((o) => o.category).join(", ")} — arriving Mon 16 Nov.</div>
+          <div className="flex-1"><b>{toReceive.length} {toReceive.length > 1 ? "deliveries" : "delivery"} on the way</b> for {toReceive.map((o) => o.category).join(", ")}, arriving Mon 16 Nov.</div>
           <Button variant="ok" onClick={receive}><PackageCheck className="size-4" />Receive deliveries</Button>
         </div>
       )}
@@ -204,7 +204,7 @@ export function Kitchen({ org }: { org: OrgProfile }) {
           <Card className="px-5 py-4"><div className="text-xs text-muted">Without a human</div><div className="text-2xl font-semibold text-ok">{auto}<span className="text-base font-normal text-muted"> / {orders.length}</span></div></Card>
           <Card className="px-5 py-4"><div className="text-xs text-muted">Needed a human</div>
             <div className="text-2xl font-semibold text-warn">{waiting.length + approved}</div>
-            {waiting.length > 0 && <div className="text-xs text-warn">{waiting.length} waiting — Approvals tab{org.pairing ? " or Telegram" : ""}</div>}
+            {waiting.length > 0 && <div className="text-xs text-warn">{waiting.length} waiting: Approvals tab{org.pairing ? " or Telegram" : ""}</div>}
           </Card>
         </div>
       )}

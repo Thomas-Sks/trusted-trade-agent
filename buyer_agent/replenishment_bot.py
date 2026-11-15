@@ -30,7 +30,7 @@ async def replenish(client: TTAPClient, items: list[ParLevel], delivery: date, l
     results = []
     for item in items:
         if item.on_hand >= item.reorder_below:
-            log(f"· {item.product_id}: {item.on_hand} {item.unit} on hand ≥ {item.reorder_below} — nothing to do")
+            log(f"· {item.product_id}: {item.on_hand} {item.unit} on hand ≥ {item.reorder_below}, nothing to do")
             continue
         qty = round(item.target - item.on_hand, 3)
         log(f"▶ {item.product_id}: {item.on_hand} {item.unit} < {item.reorder_below} → order {qty} {item.unit}")

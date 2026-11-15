@@ -21,7 +21,7 @@ function describe(l: Line) {
   const parts = [`${num(l.quantity.value)} ${l.quantity.unit} · ${l.need.product_id ? `product ${l.need.product_id}` : l.need.text}`];
   if (l.need.required_claims?.length) parts.push(`must be ${l.need.required_claims.map((c) => c.toLowerCase().replaceAll("_", " ")).join(", ")}`);
   if (l.preferences?.origin?.length) parts.push(`prefers ${l.preferences.origin.join("/").toUpperCase()}`);
-  return parts.join(" — ");
+  return parts.join(" · ");
 }
 
 export function NewRequest({ org }: { org: OrgProfile }) {
@@ -163,8 +163,8 @@ export function NewRequest({ org }: { org: OrgProfile }) {
           <div className="grid gap-4 p-6 sm:grid-cols-3">
             <div><div className="text-xs text-muted">Status</div><StatusBadge state={order.state} /></div>
             <div><div className="text-xs text-muted">Order response (Peppol)</div>
-              <div className="text-sm font-medium">{order.order_response ? `${order.order_response.code} · ${PEPPOL[order.order_response.code]}` : "—"}</div></div>
-            <div><div className="text-xs text-muted">Price locked until</div><div className="text-sm font-medium">{order.lock_until ? dateTime(order.lock_until) : "—"}</div></div>
+              <div className="text-sm font-medium">{order.order_response ? `${order.order_response.code} · ${PEPPOL[order.order_response.code]}` : "n/a"}</div></div>
+            <div><div className="text-xs text-muted">Price locked until</div><div className="text-sm font-medium">{order.lock_until ? dateTime(order.lock_until) : "n/a"}</div></div>
             {order.decision && order.decision.rules_fired.length > 0 && (
               <div className="sm:col-span-3">
                 <div className="mb-1.5 text-xs text-muted">Why a human is needed</div>

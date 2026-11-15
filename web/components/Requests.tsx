@@ -29,7 +29,7 @@ export function Requests({ org }: { org: OrgProfile }) {
                 <tr key={o.order_id} onClick={() => setOpen(open === o.order_id ? null : o.order_id)}
                   className={`cursor-pointer hover:bg-page/60 ${open === o.order_id ? "bg-accent-soft/30" : ""}`}>
                   <td className="px-5 py-3 font-mono text-xs">{o.order_id}</td>
-                  <td className="py-3 text-muted">{o.lock_until ? dateTime(o.lock_until) : "—"}</td>
+                  <td className="py-3 text-muted">{o.lock_until ? dateTime(o.lock_until) : "n/a"}</td>
                   <td className="py-3"><StatusBadge state={o.state} /></td>
                   <td className="py-3">{o.order_response && <Badge>{o.order_response.code}</Badge>}</td>
                   <td className="py-3"><div className="flex flex-wrap gap-1">{o.decision?.rules_fired.slice(0, 2).map((r) => <Badge key={r} tone="warn">{RULE_LABEL[r] ?? r}</Badge>)}</div></td>

@@ -49,7 +49,7 @@ def test_sandbox_stock_scope_keeps_visitors_from_draining_each_others_stock():
     shared, sandbox = SqliteStore(), SqliteStore(stock_scope="org")
     for s in (shared, sandbox):
         assert s.reserve("org_a", "or_1", [("p1", day, Decimal("90"), Decimal("100"))]) == []
-    # production: one ledger — org_b sees what org_a holds and cannot over-reserve
+    # production: one ledger, so org_b sees what org_a holds and cannot over-reserve
     assert shared.reserved_qty(["p1"], day, "org_b") == {"p1": Decimal("90")}
     assert shared.reserve("org_b", "or_2", [("p1", day, Decimal("20"), Decimal("100"))]) == ["p1"]
     # public-demo sandbox: each organisation only sees and competes with its own reservations

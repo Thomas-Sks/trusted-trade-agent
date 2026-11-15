@@ -34,7 +34,7 @@ class InterpretedRequest(BaseModel):
     lines: list[InterpretedLine]
     requested_date: date
     latest_acceptable_date: date
-    assumptions: list[str] = Field(description="Every default or guess made, in the buyer's language")
+    assumptions: list[str] = Field(description="Every default or guess made, in English")
     questions: list[str] = Field(default_factory=list,
                                  description="Only questions whose answer would change the result materially")
 

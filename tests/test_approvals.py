@@ -23,7 +23,7 @@ async def pending(limit: str = "500"):
 async def test_escalate_sends_card_and_audits():
     env, approvals, notifier, order = await pending()
     await approvals.escalate(order)
-    assert notifier.sent[0][0] == order.order_id and "Bloqué par" in notifier.sent[0][1]
+    assert notifier.sent[0][0] == order.order_id and "Blocked by" in notifier.sent[0][1]
     assert env.audit.list("org_a")[-1].type == "org.ttap.approval.escalated.v1"
 
 

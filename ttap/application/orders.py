@@ -97,7 +97,7 @@ class OrderService:
         self._auditor.record(
             org_id=org_id, step="order", action="created", subject=f"order/{order.order_id}",
             actor=f"agent:{org_id}", outcome="success",
-            explanation=f"Commande {order.order_id} à prix bloqué : {money(order.total_net)} € HT (offre {offer_id})",
+            explanation=f"Order {order.order_id} at locked price: €{money(order.total_net)} excl. VAT (offer {offer_id})",
             data={"offer_id": offer_id, "offer_hash": order.offer_hash,
                   "selected": [s.model_dump() for s in selected], "idempotency_key": idempotency_key})
         mandate = self._mandates.get(org_id)

@@ -63,7 +63,7 @@ async def test_nominal_flow_is_fully_audited_in_step_order():
         ("request", "org.ttap.request.created.v1"), ("lookup", "org.ttap.lookup.offer_issued.v1"),
         ("order", "org.ttap.order.created.v1"), ("approval", "org.ttap.approval.decided.v1")]
     assert events[-1].outcome == "PENDING_HUMAN"
-    assert "plafond par commande 500,00 €" in events[-1].explanation
+    assert "per-order limit €500.00" in events[-1].explanation
     assert order.mandate_version == 1 and order.decided_at == DEMO_NOW
 
 

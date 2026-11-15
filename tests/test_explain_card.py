@@ -12,11 +12,11 @@ from tests.factories import DEMO_NOW, MONDAY
 
 def test_rule_text_uses_context_values():
     ctx = {"total_net": Decimal("3030.00"), "limit_per_order_net": Decimal("2000")}
-    assert explain_rules(["total_over_order_limit"], ctx) == ["Total 3 030,00 € HT > plafond par commande 2 000,00 €"]
+    assert explain_rules(["total_over_order_limit"], ctx) == ["Total €3,030.00 excl. VAT > per-order limit €2,000.00"]
 
 
 def test_unknown_rule_never_raises():
-    assert explain_rules(["something_new"], {}) == ["Règle déclenchée : something_new"]
+    assert explain_rules(["something_new"], {}) == ["Rule triggered: something_new"]
 
 
 def cand(pid="P1", qty="300", total="3030.00", stock=StockStatus.VERIFIED_UNLIMITED, changes=(),
@@ -47,13 +47,13 @@ def fixtures(c: Candidate, usual: list[UsualItem], step_up="5000"):
 def test_card_shows_rules_deviation_and_cutoff():
     order, offer, mandate = fixtures(cand(), [UsualItem(product_id="P1", median_qty=Decimal("100"))])
     card = build_card(order, offer, mandate, DEMO_NOW)
-    assert card.reasons == ["Total 3 030,00 € HT > plafond par commande 2 000,00 €"]
-    assert card.lines[0].vs_usual == "×3.0 vs habitude"
+    assert card.reasons == ["Total €3,030.00 excl. VAT > per-order limit €2,000.00"]
+    assert card.lines[0].vs_usual == "×3.0 vs usual"
     assert card.minutes_to_cutoff == 95
     assert card.total_gross == Decimal("3439.05")
     assert card.step_up_required is False
     text = render_card_text(card)
-    assert "Bloqué par" in text and "×3.0 vs habitude" in text and "3fa9c1d2" in text
+    assert "Blocked by" in text and "×3.0 vs usual" in text and "3fa9c1d2" in text
 
 
 def test_card_flags_new_product_unverified_stock_origin_and_step_up():
@@ -61,9 +61,9 @@ def test_card_flags_new_product_unverified_stock_origin_and_step_up():
              origin=OriginAssurance.CONFLICT, origins=("gb", "nl"))
     order, offer, mandate = fixtures(c, [UsualItem(product_id="OTHER", median_qty=Decimal("5"))], step_up="1000")
     card = build_card(order, offer, mandate, DEMO_NOW)
-    assert card.lines[0].vs_usual == "nouveau produit"
-    assert any("stock fournisseur non vérifié" in w for w in card.warnings)
-    assert any("origine contradictoire" in w for w in card.warnings)
+    assert card.lines[0].vs_usual == "new product"
+    assert any("unverified supplier stock" in w for w in card.warnings)
+    assert any("conflicting origin" in w for w in card.warnings)
     assert card.lines[0].changes == ["origin:nl"]
     assert card.step_up_required is True
 
@@ -75,5 +75,5 @@ def test_telegram_html_is_short_escaped_and_french():
     order, offer, mandate = fixtures(c, [UsualItem(product_id="P1", median_qty=Decimal("100"))])
     html = render_card_html(build_card(order, offer, mandate, DEMO_NOW))
     assert "&lt;special&gt; &amp; co" in html and "<special>" not in html
-    assert "3 030,00 €" in html and "1 h 35" in html and "🌍 origine NL" in html and "lun. 16/11" in html
+    assert "€3,030.00" in html and "1 h 35" in html and "🌍 origin NL" in html and "Mon 16 Nov" in html
     assert max(len(line) for line in html.splitlines() if line.startswith("📦")) < 60

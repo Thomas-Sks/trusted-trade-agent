@@ -70,7 +70,7 @@ def test_escalation_then_human_approval_and_verified_audit():
     assert order["state"] == "PENDING_HUMAN"
     assert [o["order_id"] for o in c.get("/approvals", headers=APPROVER).json()] == [order["order_id"]]
     card = c.get(f"/orders/{order['order_id']}/card", headers=APPROVER).json()
-    assert card["reasons"] == ["Total 1 010,00 € HT > plafond par commande 500,00 €"]
+    assert card["reasons"] == ["Total €1,010.00 excl. VAT > per-order limit €500.00"]
     assert c.post(f"/orders/{order['order_id']}/approve", json={}, headers=A).status_code == 401
     done = c.post(f"/orders/{order['order_id']}/approve", json={"expected_version": order["version"]},
                   headers=APPROVER)

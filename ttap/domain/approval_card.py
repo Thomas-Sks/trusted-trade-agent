@@ -24,13 +24,13 @@ def _vs_usual(c: Candidate, mandate: Mandate | None) -> str | None:
         return None
     usual = {u.product_id: u.median_qty for u in mandate.usual_list}
     if c.product_id not in usual:
-        return "nouveau produit"
+        return "new product"
     median = usual[c.product_id]
     if median <= 0:
         return None
     ratio = c.qty_sales_units / median
     if ratio >= HIGH_RATIO or ratio <= LOW_RATIO:
-        return f"×{ratio.quantize(Decimal('0.1'))} vs habitude"
+        return f"×{ratio.quantize(Decimal('0.1'))} vs usual"
     return None
 
 
@@ -39,19 +39,19 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
     warnings: list[str] = []
     unverified = sum((c.line_total_net for c in cands if c.stock == StockStatus.UNKNOWN_SUPPLIER_STOCK), Decimal(0))
     if unverified:
-        warnings.append(f"stock fournisseur non vérifié pour {unverified} € HT")
+        warnings.append(f"unverified supplier stock worth €{unverified} excl. VAT")
     for c in cands:
         if c.origin == OriginAssurance.CONFLICT:
-            warnings.append(f"origine contradictoire ({'/'.join(c.origins)}) : {c.name}")
+            warnings.append(f"conflicting origin ({'/'.join(c.origins)}): {c.name}")
     if offer.simulated:
-        warnings.append("scénario SIMULÉ actif : " + ", ".join(offer.simulated))
+        warnings.append("SIMULATED scenario active: " + ", ".join(offer.simulated))
     if any(c.stale for c in cands):
-        warnings.append("données fournisseur périmées (panne amont)")
+        warnings.append("stale supplier data (upstream outage)")
     lines_by_id = {line.line_id: line for line in offer.lines}
     for sel in order.selected:
         line = lines_by_id[sel.line_id]
         if sel.tier == "split" and line.backorder_qty > 0:
-            warnings.append(f"reliquat non couvert : {line.backorder_qty.normalize():f} (unité demandée)")
+            warnings.append(f"backorder not covered: {line.backorder_qty.normalize():f} (requested unit)")
     cutoffs = [c.order_cutoff for c in cands if c.order_cutoff is not None]
     minutes = int((min(cutoffs) - now).total_seconds() // 60) if cutoffs else None
     gross = sum((c.line_total_net * (1 + c.vat_rate / 100) for c in cands), Decimal(0)).quantize(CENT)
@@ -72,20 +72,20 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
 
 
 def render_card_text(card: ApprovalCard) -> str:
-    rows = [f"🟠 Approbation requise — {card.org_id} · commande {card.order_id} · offre {card.offer_hash_short}",
-            "Bloqué par :"]
-    rows += [f" • {r}" for r in card.reasons] or [" • (aucune règle)"]
-    rows.append("Lignes :")
+    rows = [f"🟠 Approval required — {card.org_id} · order {card.order_id} · offer {card.offer_hash_short}",
+            "Blocked by:"]
+    rows += [f" • {r}" for r in card.reasons] or [" • (no rule)"]
+    rows.append("Lines:")
     for line in card.lines:
         extra = [x for x in (line.vs_usual, *line.changes) if x]
-        rows.append(f" • {line.qty_sales_units} {line.sales_unit} {line.name} — {line.line_total_net} € HT"
+        rows.append(f" • {line.qty_sales_units} {line.sales_unit} {line.name} — €{line.line_total_net} excl. VAT"
                     + (f" ({', '.join(extra)})" if extra else ""))
     if card.warnings:
-        rows.append("Alertes : " + " · ".join(card.warnings))
-    rows.append(f"Total {card.total_net} € HT / {card.total_gross} € TTC")
+        rows.append("Warnings: " + " · ".join(card.warnings))
+    rows.append(f"Total €{card.total_net} excl. VAT / €{card.total_gross} incl. VAT")
     if card.delivery_date:
-        cutoff = f" — heure limite dans {card.minutes_to_cutoff} min" if card.minutes_to_cutoff is not None else ""
-        rows.append(f"Livraison {card.delivery_date.isoformat()}{cutoff}")
+        cutoff = f" — order cut-off in {card.minutes_to_cutoff} min" if card.minutes_to_cutoff is not None else ""
+        rows.append(f"Delivery {card.delivery_date.isoformat()}{cutoff}")
     if card.step_up_required:
-        rows.append("🔐 Montant élevé : approbation via la page web uniquement")
+        rows.append("🔐 High amount: approve on the web console only")
     return "\n".join(rows)

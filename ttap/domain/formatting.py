@@ -1,25 +1,16 @@
-"""Human-readable French formatting shared by every channel (deterministic)."""
+"""Human-readable English formatting shared by every channel (deterministic)."""
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
-NBSP = " "
-
 
 def money(value: object, decimals: int = 2) -> str:
+    """3030 -> '3,030.00'."""
     try:
         d = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return str(value)
-    q = d.quantize(Decimal(1).scaleb(-decimals)) if decimals else d.quantize(Decimal(1))
-    sign = "-" if q < 0 else ""
-    whole, _, frac = f"{abs(q):f}".partition(".")
-    groups = []
-    while whole:
-        groups.insert(0, whole[-3:])
-        whole = whole[:-3]
-    out = " ".join(groups) or "0"
-    return f"{sign}{out},{frac}" if frac else f"{sign}{out}"
+    return f"{d:,.{decimals}f}"
 
 
 def qty(value: object) -> str:
@@ -29,11 +20,11 @@ def qty(value: object) -> str:
 
 def duration_minutes(minutes: int) -> str:
     if minutes < 0:
-        return "dépassée"
+        return "passed"
     days, rem = divmod(minutes, 60 * 24)
     hours, mins = divmod(rem, 60)
     if days:
-        return f"{days} j {hours} h"
+        return f"{days} d {hours} h"
     if hours:
         return f"{hours} h {mins:02d}"
     return f"{mins} min"
@@ -44,7 +35,6 @@ def shorten(text: str, limit: int = 42) -> str:
 
 
 def when(dt) -> str:
-    """'lun. 16/11 à 08:30' (date or datetime)."""
-    days = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
-    base = f"{days[dt.weekday()]} {dt.day:02d}/{dt.month:02d}"
-    return f"{base} à {dt.hour:02d}:{dt.minute:02d}" if hasattr(dt, "hour") else base
+    """'Mon 16 Nov, 08:30' (date or datetime)."""
+    base = dt.strftime("%a %d %b")
+    return f"{base}, {dt.hour:02d}:{dt.minute:02d}" if hasattr(dt, "hour") else base

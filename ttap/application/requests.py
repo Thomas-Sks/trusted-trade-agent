@@ -20,7 +20,7 @@ class RequestService:
         self._auditor.record(
             org_id=org_id, step="request", action="created", subject=f"request/{req.request_id}",
             actor=f"agent:{org_id}", outcome="success",
-            explanation=(f"Demande {req.request_id} : {len(lines)} ligne(s), "
-                         f"livraison souhaitée le {when(delivery.requested_date)}"),
+            explanation=(f"Request {req.request_id}: {len(lines)} line(s), "
+                         f"delivery wanted on {when(delivery.requested_date)}"),
             data={"request": req.model_dump(mode="json")})
         return req

@@ -38,11 +38,11 @@ class ApprovalBotLogic:
     def link(self, telegram_id: int, code: str) -> str:
         ref = self._pairing.get(code.strip())
         if ref is None:
-            return "❓ Code d'appairage inconnu."
+            return "❓ Unknown pairing code."
         org_id, user_id = ref
         self._store.link_approver(telegram_id, org_id, user_id)
-        return (f"🤝 <b>Appairé</b> : {escape(user_id)} pour <code>{escape(org_id)}</code>\n"
-                "Les demandes de validation arriveront ici.")
+        return (f"🤝 <b>Paired</b>: {escape(user_id)} for <code>{escape(org_id)}</code>\n"
+                "Approval requests will arrive here.")
 
     def _token(self, order: Order, action: str) -> str:
         expires = self._clock.now() + self._ttl
@@ -55,32 +55,32 @@ class ApprovalBotLogic:
 
     def buttons(self, order: Order, card: ApprovalCard) -> list[Button]:
         if card.step_up_required:
-            approve: Button = ("🔐 Valider sur le web", None,
+            approve: Button = ("🔐 Approve on web", None,
                                f"{self._web}/orders/{order.order_id}/review" if self._web else None)
         else:
-            approve = ("✅ Approuver", self._token(order, "approve"), None)
-        return [approve, ("❌ Refuser", self._token(order, "reject"), None),
-                ("🔎 Détails", self._token(order, "detail"), None)]
+            approve = ("✅ Approve", self._token(order, "approve"), None)
+        return [approve, ("❌ Reject", self._token(order, "reject"), None),
+                ("🔎 Details", self._token(order, "detail"), None)]
 
     async def handle(self, telegram_id: int, data: str) -> BotReply:
         approver = self._store.approver_by_telegram(telegram_id)
         if approver is None:
-            return BotReply("error", "🔒 Compte non appairé : ouvrez le lien d'appairage ou envoyez /start &lt;code&gt;.")
+            return BotReply("error", "🔒 Account not paired: open the pairing link or send /start &lt;code&gt;.")
         token = self._store.get_action_token(data.removeprefix(PREFIX))
         if token is None or token.used or self._clock.now() >= token.expires_at:
-            return BotReply("error", "⌛ Action expirée ou déjà utilisée.")
+            return BotReply("error", "⌛ Action expired or already used.")
         if token.org_id != approver.org_id:
-            return BotReply("error", "🚫 Non autorisé pour cette organisation.")
+            return BotReply("error", "🚫 Not authorised for this organisation.")
         try:
             if token.action == "detail":
                 card = self.approvals.card(token.org_id, token.order_id)
                 return BotReply("detail", render_card_html(card, detailed=True))
             if not self._store.consume_action_token(token.token_id):
-                return BotReply("error", "⌛ Action expirée ou déjà utilisée.")
+                return BotReply("error", "⌛ Action expired or already used.")
             if token.action == "approve":
                 done = self.approvals.approve(token.org_id, token.order_id, approver.user_id, token.version)
                 return BotReply("approved", status_html("approved", approver.user_id, done.total_net))
-            self.approvals.reject(token.org_id, token.order_id, approver.user_id, "refus via Telegram", token.version)
+            self.approvals.reject(token.org_id, token.order_id, approver.user_id, "rejected via Telegram", token.version)
             return BotReply("rejected", status_html("rejected", approver.user_id))
         except TTAPError as exc:
             return BotReply("error", f"⚠️ <b>{escape(exc.code)}</b> : {escape(str(exc))}")

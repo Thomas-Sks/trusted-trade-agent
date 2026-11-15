@@ -40,7 +40,7 @@ class InterpretService:
                  "assumptions": interp.assumptions, "questions": interp.questions}
         self._auditor.record(org_id=org_id, step="request", action="interpreted", subject="interpretation",
                              actor="llm:interpreter", outcome="draft",
-                             explanation=f"Texte libre interprété en {len(lines)} ligne(s) ; hypothèses : "
-                                         + ("; ".join(interp.assumptions) or "aucune"),
+                             explanation=f"Free text interpreted into {len(lines)} line(s); assumptions: "
+                                         + ("; ".join(interp.assumptions) or "none"),
                              data={"text": text, "draft": draft})
         return draft

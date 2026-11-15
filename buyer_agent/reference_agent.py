@@ -27,7 +27,7 @@ the TTAP tools. Process, in order:
 4. Choose per line: 'better' if present (matches all preferences), else 'good'; if no tier exists but a 'split'
    plan exists, choose 'split'. Never invent prices, stock or products.
 5. place_order once. Then explain_order.
-Finish with a short report in the buyer's language: what was ordered, total, the decision (auto-approved, waiting
+Finish with a short report in English: what was ordered, total, the decision (auto-approved, waiting
 for human approval with the reasons, or denied) and any exception (partial, substitute, backorder)."""
 
 

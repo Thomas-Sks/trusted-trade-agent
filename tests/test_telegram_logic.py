@@ -26,8 +26,8 @@ def data_for(buttons, label_prefix):
 
 async def test_pairing():
     env, logic, _ = await setup()
-    assert "alice" in logic.link(111, "PAIR-A") and "Appairé" in logic.link(111, "PAIR-A")
-    assert "inconnu" in logic.link(222, "WRONG")
+    assert "alice" in logic.link(111, "PAIR-A") and "Paired" in logic.link(111, "PAIR-A")
+    assert "Unknown" in logic.link(222, "WRONG")
     assert env.store.approver_chats("org_a") == [111]
 
 
@@ -39,15 +39,15 @@ async def test_click_by_paired_approver_approves_once():
     assert len(approve) <= 64
     assert (await logic.handle(111, approve)).kind == "approved"
     assert env.store.get_order("org_a", order.order_id).state == OrderState.APPROVED
-    assert "déjà utilisée" in (await logic.handle(111, approve)).html
+    assert "already used" in (await logic.handle(111, approve)).html
 
 
 async def test_unpaired_and_other_org_cannot_act():
     env, logic, order = await setup()
     logic.link(222, "PAIR-B")
     approve = data_for(logic.buttons(order, approvals_card(logic, order)), "✅")
-    assert "non appairé" in (await logic.handle(999, approve)).html
-    assert "Non autorisé" in (await logic.handle(222, approve)).html
+    assert "not paired" in (await logic.handle(999, approve)).html
+    assert "Not authorised" in (await logic.handle(222, approve)).html
     assert env.store.get_order("org_a", order.order_id).state == OrderState.PENDING_HUMAN
 
 
@@ -56,7 +56,7 @@ async def test_expired_token_refused():
     logic.link(111, "PAIR-A")
     approve = data_for(logic.buttons(order, approvals_card(logic, order)), "✅")
     env.clock.at = env.clock.at + timedelta(days=1)
-    assert "expirée" in (await logic.handle(111, approve)).html
+    assert "expired" in (await logic.handle(111, approve)).html
 
 
 async def test_reject_and_detail():
@@ -64,7 +64,7 @@ async def test_reject_and_detail():
     logic.link(111, "PAIR-A")
     buttons = logic.buttons(order, approvals_card(logic, order))
     detail = await logic.handle(111, data_for(buttons, "🔎"))
-    assert detail.kind == "detail" and "<b>Pourquoi</b>" in detail.html and "stock vérifié" in detail.html
+    assert detail.kind == "detail" and "<b>Why</b>" in detail.html and "verified stock" in detail.html
     assert (await logic.handle(111, data_for(buttons, "❌"))).kind == "rejected"
     assert env.store.get_order("org_a", order.order_id).state == OrderState.REJECTED
 

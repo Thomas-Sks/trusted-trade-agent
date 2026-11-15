@@ -22,7 +22,7 @@ class FakeInterpreter:
             lines=[InterpretedLine(need_text="milk", required_claims=["FREE_FROM_LACTOSE", "NOT_A_CODE"],
                                    quantity_value=1000, quantity_unit="L", origin_preferences=["fi"])],
             requested_date=date(2026, 11, 16), latest_acceptable_date=date(2026, 11, 16),
-            assumptions=["lait demi-écrémé par défaut"], questions=[])
+            assumptions=["semi-skimmed milk by default"], questions=[])
 
 
 def app(interpreter):
@@ -40,7 +40,7 @@ def test_interpret_returns_protocol_draft_and_filters_unknown_codes():
     draft = c.post("/interpret", json={"text": "1000 L de lait sans lactose pour lundi"}, headers=A).json()
     assert draft["lines"][0]["need"]["required_claims"] == ["FREE_FROM_LACTOSE"]
     assert draft["lines"][0]["quantity"] == {"value": "1000.0", "unit": "L"}
-    assert draft["assumptions"] == ["lait demi-écrémé par défaut"]
+    assert draft["assumptions"] == ["semi-skimmed milk by default"]
     assert fake.seen[1] == date(2026, 11, 12)
     rq = c.post("/requests", json={"lines": draft["lines"], "delivery": draft["delivery"]}, headers=A)
     assert rq.status_code == 201

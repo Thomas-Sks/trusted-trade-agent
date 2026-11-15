@@ -23,7 +23,7 @@ Rules:
 - Use product_id only if the message clearly refers to one of the buyer's usual products listed below.
 - Convert relative dates using today's date. If no date is given, use the next delivery day and say so.
 - quantity_unit is L for liquids, KG for weight, PIECE for countable items.
-- Record every guess in `assumptions` (buyer's language). Ask a question only if the answer would change the
+- Record every guess in `assumptions`, written in English. Write questions in English. Ask a question only if the answer would change the
   product, the quantity or a hard constraint; otherwise choose a sensible default and state it.
 Never invent prices or stock."""
 

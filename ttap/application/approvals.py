@@ -64,7 +64,7 @@ class ApprovalService:
         self._auditor.record(
             org_id=order.org_id, step="approval", action="escalated", subject=f"order/{order.order_id}",
             actor="system", outcome="PENDING_HUMAN",
-            explanation=f"Carte d'approbation envoyée : {' ; '.join(card.reasons)}",
+            explanation=f"Approval card sent: {'; '.join(card.reasons)}",
             data={"card": card.model_dump(mode="json")})
 
     def approve(self, org_id: str, order_id: str, approver: str, expected_version: int | None = None) -> Order:
@@ -75,7 +75,7 @@ class ApprovalService:
         self._auditor.record(
             org_id=org_id, step="approval", action="approved", subject=f"order/{order_id}",
             actor=f"approver:{approver}", outcome="APPROVED",
-            explanation=f"Commande {order_id} approuvée par {approver} ({money(order.total_net)} € HT)",
+            explanation=f"Order {order_id} approved by {approver} (€{money(order.total_net)} excl. VAT)",
             data={"version": done.version})
         return done
 
@@ -90,7 +90,7 @@ class ApprovalService:
         self._auditor.record(
             org_id=org_id, step="approval", action="rejected", subject=f"order/{order_id}",
             actor=f"approver:{approver}", outcome="REJECTED",
-            explanation=f"Commande {order_id} rejetée par {approver} : {reason}", data={"reason": reason})
+            explanation=f"Order {order_id} rejected by {approver}: {reason}", data={"reason": reason})
         return done
 
     def modify(self, org_id: str, order_id: str, approver: str, selected: list[SelectedLine],
@@ -117,7 +117,7 @@ class ApprovalService:
         self._auditor.record(
             org_id=org_id, step="approval", action="modified", subject=f"order/{order_id}",
             actor=f"approver:{approver}", outcome=state.value,
-            explanation=f"Modifiée par {approver}, réévaluée : {explain_decision(done)}",
+            explanation=f"Modified by {approver}, re-evaluated: {explain_decision(done)}",
             data={"selected": [s.model_dump() for s in selected], "rules_fired": decision.rules_fired})
         return done
 
@@ -134,7 +134,7 @@ class ApprovalService:
                 self._auditor.record(
                     org_id=order.org_id, step="approval", action="expired", subject=f"order/{order.order_id}",
                     actor="system", outcome="EXPIRED",
-                    explanation=f"Commande {order.order_id} expirée sans approbation : refus par défaut",
+                    explanation=f"Order {order.order_id} expired without approval: denied by default",
                     data={"lock_until": order.lock_until.isoformat()})
                 expired.append(after)
         return expired

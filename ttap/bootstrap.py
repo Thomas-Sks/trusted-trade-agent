@@ -124,7 +124,7 @@ def build_live() -> LiveApp:
     scenario = ScenarioGateway(ValioGateway(client, os.environ["VALIO_API_KEY"]))
     gateway = CachingGateway(scenario)
     signer = EcdsaSigner.load_or_create(os.environ.get("TTAP_SIGNING_KEY", str(ROOT / "ttap_signing_key.json")))
-    store = SqliteStore(os.environ.get("TTAP_DB", "ttap.db"))
+    store = SqliteStore(os.environ.get("TTAP_DB", "ttap.db"), stock_scope=os.environ.get("TTAP_STOCK_SCOPE", "global"))
     clock = ShiftedClock(DEMO_START)
     telegram = None
     if os.environ.get("TELEGRAM_BOT_TOKEN"):

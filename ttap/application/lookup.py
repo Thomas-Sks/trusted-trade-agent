@@ -58,7 +58,7 @@ class LookupService:
             avail = await self._gateway.availability(ids, req.delivery.requested_date) if ids else {}
         except UpstreamUnavailable as exc:
             raise UpstreamError(str(exc)) from exc
-        reserved = self._store.reserved_qty(list(avail), req.delivery.requested_date)
+        reserved = self._store.reserved_qty(list(avail), req.delivery.requested_date, org_id)
         avail = {pid: a.model_copy(update={"available_amount": a.available_amount - reserved[pid],
                                            "reserved": reserved[pid]})
                  if a.available_amount is not None and reserved.get(pid) else a for pid, a in avail.items()}

@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS action_tokens (id TEXT PRIMARY KEY, org_id TEXT NOT N
 
 
 class SqliteStore:
-    def __init__(self, path: str = ":memory:"):
+    def __init__(self, path: str = ":memory:", stock_scope: str = "global"):
+        """stock_scope="global": one reservation ledger for everyone (production). "org": public-demo sandbox where
+        each organisation only sees and competes with its own reservations, so visitors cannot drain each other."""
+        self._per_org = stock_scope == "org"
         self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self._lock = threading.Lock()
         if path != ":memory:":
@@ -130,14 +133,18 @@ class SqliteStore:
         return self._write("UPDATE action_tokens SET used = 1 WHERE id = ? AND used = 0", (token_id,)) == 1
 
     # --- reservations (available-to-promise ledger) -------------------------------------------------------
-    def _reserved_locked(self, product_id: str, delivery: str) -> Decimal:
-        rows = self._db.execute("SELECT qty FROM reservations WHERE product_id = ? AND delivery_date = ? "
-                                "AND status IN ('HELD', 'FIRM')", (product_id, delivery)).fetchall()
+    def _reserved_locked(self, product_id: str, delivery: str, org_id: str | None = None) -> Decimal:
+        sql = ("SELECT qty FROM reservations WHERE product_id = ? AND delivery_date = ? "
+               "AND status IN ('HELD', 'FIRM')")
+        args: tuple = (product_id, delivery)
+        if self._per_org and org_id:
+            sql, args = sql + " AND org_id = ?", (*args, org_id)
+        rows = self._db.execute(sql, args).fetchall()
         return sum((Decimal(r[0]) for r in rows), Decimal("0"))
 
-    def reserved_qty(self, product_ids: list[str], delivery: date) -> dict[str, Decimal]:
+    def reserved_qty(self, product_ids: list[str], delivery: date, org_id: str | None = None) -> dict[str, Decimal]:
         with self._lock:
-            return {pid: self._reserved_locked(pid, delivery.isoformat()) for pid in product_ids}
+            return {pid: self._reserved_locked(pid, delivery.isoformat(), org_id) for pid in product_ids}
 
     def reserve(self, org_id: str, order_id: str,
                 items: list[tuple[str, date, Decimal, Decimal]]) -> list[str]:
@@ -146,7 +153,7 @@ class SqliteStore:
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 short = [pid for pid, day, qty, upstream in items
-                         if upstream - self._reserved_locked(pid, day.isoformat()) < qty]
+                         if upstream - self._reserved_locked(pid, day.isoformat(), org_id) < qty]
                 if short:
                     self._db.execute("ROLLBACK")
                     return short

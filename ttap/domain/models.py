@@ -272,3 +272,18 @@ class ApprovalCard(BaseModel):
     delivery_date: date | None
     minutes_to_cutoff: int | None
     step_up_required: bool
+
+
+class ApproverRef(BaseModel):
+    org_id: str
+    user_id: str
+
+
+class ActionToken(BaseModel):
+    token_id: str
+    org_id: str
+    order_id: str
+    version: int
+    action: Literal["approve", "reject", "detail"]
+    expires_at: datetime
+    used: bool = False

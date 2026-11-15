@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from datetime import datetime
 
-from ttap.domain.models import Offer, Order, OrderState, PurchaseRequest
+from ttap.domain.models import ActionToken, ApproverRef, Offer, Order, OrderState, PurchaseRequest
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests (org_id TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL,
@@ -13,6 +14,10 @@ CREATE TABLE IF NOT EXISTS offers (org_id TEXT NOT NULL, id TEXT NOT NULL, body 
 CREATE TABLE IF NOT EXISTS orders (org_id TEXT NOT NULL, id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
   state TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL,
   PRIMARY KEY (org_id, id), UNIQUE (org_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS approver_links (telegram_id INTEGER PRIMARY KEY, org_id TEXT NOT NULL,
+  user_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS action_tokens (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, order_id TEXT NOT NULL,
+  version INTEGER NOT NULL, action TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0);
 """
 
 
@@ -83,3 +88,32 @@ class SqliteStore:
             "WHERE org_id = ? AND id = ? AND state = ? AND version = ?",
             (updated.state.value, updated.version, updated.model_dump_json(), org_id, order_id,
              expected_state.value, expected_version)) == 1
+
+    def link_approver(self, telegram_id: int, org_id: str, user_id: str) -> None:
+        self._write("INSERT OR REPLACE INTO approver_links (telegram_id, org_id, user_id) VALUES (?, ?, ?)",
+                    (telegram_id, org_id, user_id))
+
+    def approver_by_telegram(self, telegram_id: int) -> ApproverRef | None:
+        row = self._one("SELECT org_id, user_id FROM approver_links WHERE telegram_id = ?", (telegram_id,))
+        return ApproverRef(org_id=row[0], user_id=row[1]) if row else None
+
+    def approver_chats(self, org_id: str) -> list[int]:
+        with self._lock:
+            rows = self._db.execute("SELECT telegram_id FROM approver_links WHERE org_id = ?", (org_id,)).fetchall()
+        return [r[0] for r in rows]
+
+    def save_action_token(self, token: ActionToken) -> None:
+        self._write("INSERT INTO action_tokens (id, org_id, order_id, version, action, expires_at) VALUES (?,?,?,?,?,?)",
+                    (token.token_id, token.org_id, token.order_id, token.version, token.action,
+                     token.expires_at.isoformat()))
+
+    def get_action_token(self, token_id: str) -> ActionToken | None:
+        row = self._one("SELECT id, org_id, order_id, version, action, expires_at, used FROM action_tokens "
+                        "WHERE id = ?", (token_id,))
+        if not row:
+            return None
+        return ActionToken(token_id=row[0], org_id=row[1], order_id=row[2], version=row[3], action=row[4],
+                           expires_at=datetime.fromisoformat(row[5]), used=bool(row[6]))
+
+    def consume_action_token(self, token_id: str) -> bool:
+        return self._write("UPDATE action_tokens SET used = 1 WHERE id = ? AND used = 0", (token_id,)) == 1

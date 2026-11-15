@@ -10,6 +10,15 @@ from ttap.domain.models import (
 from ttap.domain.quantities import content_per_sales_unit, sales_units_needed
 
 CENT = Decimal("0.01")
+DEFAULT_RELIABILITY = Decimal("0.9")
+NO_CARBON = Decimal("1e9")
+
+
+def best_key(c: Candidate) -> tuple:
+    """Quality first (labels, stock certainty, delivery reliability, lower carbon), then price — all generic."""
+    reliability = c.reliability if c.reliability is not None else DEFAULT_RELIABILITY
+    carbon = c.carbon_kg_per_kg if c.carbon_kg_per_kg is not None else NO_CARBON
+    return (-c.score, -reliability, carbon, c.comparison_net, c.product_id)
 
 
 def evaluate_candidate(p: CatalogProduct, line: RequestLine, price: UpstreamPrice | None,
@@ -55,6 +64,7 @@ def evaluate_candidate(p: CatalogProduct, line: RequestLine, price: UpstreamPric
         price_valid_to=price.valid_to, stock=status, available_amount=av.available_amount,
         delivery_date=av.available_date, order_cutoff=av.closing_time, origin=origin, origins=origins,
         changes_vs_request=changes, score=label_hits + verified_bonus,
+        reliability=p.reliability, carbon_kg_per_kg=p.carbon_kg_per_kg,
     )
 
 
@@ -72,6 +82,6 @@ def build_offer_line(line: RequestLine, products: list[CatalogProduct], prices: 
         preferred = [c for c in by_price if not c.changes_vs_request]
         if preferred:
             tiers["better"] = preferred[0]
-            tiers["best"] = sorted(preferred, key=lambda c: (-c.score, c.comparison_net, c.product_id))[0]
+            tiers["best"] = sorted(preferred, key=best_key)[0]
     return OfferLine(line_id=line.line_id, tiers=tiers, excluded=excluded,
                      exceptions=[] if candidates else ["NO_ELIGIBLE_PRODUCT"])

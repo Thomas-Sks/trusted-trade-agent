@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import re
@@ -74,6 +75,24 @@ class JsonCatalog:
         raw = Path(path).read_bytes()
         version = "sha256:" + hashlib.sha256(raw).hexdigest()[:16]
         return cls([parse_product(r) for r in json.loads(raw)], version)
+
+    @classmethod
+    def from_files(cls, product_json: str | Path, reliability_csv: str | Path | None = None,
+                   carbon_csv: str | Path | None = None) -> JsonCatalog:
+        raw = Path(product_json).read_bytes()
+        digest = hashlib.sha256(raw)
+        extras: dict[str, dict] = {}
+        for path, column, field in ((reliability_csv, "deliveryReliability", "reliability"),
+                                    (carbon_csv, "AVG kg CO2-eq/kg", "carbon_kg_per_kg")):
+            if path and Path(path).exists():
+                data = Path(path).read_bytes()
+                digest.update(data)
+                for row in csv.DictReader(data.decode().splitlines()):
+                    if row.get(column):
+                        extras.setdefault(row["productId"], {})[field] = Decimal(row[column])
+        products = [parse_product(r) for r in json.loads(raw)]
+        products = [p.model_copy(update=extras[p.product_id]) if p.product_id in extras else p for p in products]
+        return cls(products, "sha256:" + digest.hexdigest()[:16])
 
     @property
     def version(self) -> str:

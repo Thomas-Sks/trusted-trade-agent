@@ -77,6 +77,8 @@ class CatalogProduct(BaseModel):
     origin_manufacturer: tuple[str, ...]
     substitutes: tuple[str, ...]
     variable_weight: bool
+    reliability: Decimal | None = None
+    carbon_kg_per_kg: Decimal | None = None
 
     def display_name(self, lang: str = "en") -> str:
         return self.names.get(lang) or next(iter(self.names.values()), self.product_id)
@@ -143,6 +145,11 @@ class Candidate(BaseModel):
     origins: list[str]
     changes_vs_request: list[str]
     score: float
+    reliability: Decimal | None = None
+    carbon_kg_per_kg: Decimal | None = None
+    is_substitute: bool = False
+    partial: bool = False
+    missing_qty: Decimal = Decimal("0")
 
 
 class Exclusion(BaseModel):

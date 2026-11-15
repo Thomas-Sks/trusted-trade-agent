@@ -91,8 +91,10 @@ class LiveApp:
 
 
 def build_live() -> LiveApp:
-    catalog = JsonCatalog.from_file(ROOT / os.environ.get(
-        "CATALOG_PATH", "resources/valio_aimo_junction26_product_data.json"))
+    res = ROOT / "resources"
+    catalog = JsonCatalog.from_files(
+        ROOT / os.environ.get("CATALOG_PATH", "resources/valio_aimo_junction26_product_data.json"),
+        res / "valio_aimo_junction26_delivery_reliability.csv", res / "valio_aimo_junction26_carbon_footprint.csv")
     client = httpx.AsyncClient(base_url=os.environ.get("VALIO_BASE_URL", "https://junction26.valioaimo.fi"),
                                timeout=30.0)
     gateway = ValioGateway(client, os.environ["VALIO_API_KEY"])

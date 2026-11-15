@@ -54,3 +54,31 @@ def test_unknown_supplier_stock_is_kept_and_flagged():
     out = build_offer_line(line(), products, {"T": price("T", "1", "1")},
                            {"T": stock("T", "999999", model="Terminal")}, DELIVERY)
     assert out.tiers["good"].stock == StockStatus.UNKNOWN_SUPPLIER_STOCK
+
+
+def test_best_prefers_reliability_then_lower_carbon():
+    from tests.factories import raw_product
+    from ttap.adapters.outbound.catalog_json import parse_product
+    base = dict(claims=("FREE_FROM_LACTOSE",))
+    a = parse_product(raw_product("A", "Milk 1 l", **base)).model_copy(update={"reliability": Decimal("0.8")})
+    b = parse_product(raw_product("B", "Milk 1 l", **base)).model_copy(
+        update={"reliability": Decimal("1.0"), "carbon_kg_per_kg": Decimal("2.0")})
+    c = parse_product(raw_product("C", "Milk 1 l", **base)).model_copy(
+        update={"reliability": Decimal("1.0"), "carbon_kg_per_kg": Decimal("1.1")})
+    prices = {p: price(p, "1.00", "1.00") for p in "ABC"}
+    avail = {p: stock(p, "9999999999") for p in "ABC"}
+    out = build_offer_line(line(), [a, b, c], prices, avail, DELIVERY)
+    assert out.tiers["best"].product_id == "C"
+    assert out.tiers["best"].reliability == Decimal("1.0")
+
+
+def test_catalog_from_files_loads_reliability_and_carbon(tmp_path):
+    import json
+    from tests.factories import raw_product
+    from ttap.adapters.outbound.catalog_json import JsonCatalog
+    (tmp_path / "p.json").write_text(json.dumps([raw_product("1", "x"), raw_product("2", "y")]))
+    (tmp_path / "r.csv").write_text("productId,deliveryReliability\n1,0.95\n")
+    (tmp_path / "c.csv").write_text("productId,AVG kg CO2-eq/kg\n1,1.1\n2,3.5\n")
+    cat = JsonCatalog.from_files(tmp_path / "p.json", tmp_path / "r.csv", tmp_path / "c.csv")
+    assert cat.get("1").reliability == Decimal("0.95") and cat.get("2").reliability is None
+    assert cat.get("2").carbon_kg_per_kg == Decimal("3.5")

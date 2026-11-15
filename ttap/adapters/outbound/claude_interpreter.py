@@ -3,11 +3,16 @@ from __future__ import annotations
 
 from datetime import date
 
+import os
+
 import anthropic
 
 from ttap.domain.interpretation import CLAIM_CODES, LABEL_CODES, InterpretedRequest
 
-MODEL = "claude-opus-5-5"
+# Simple extraction: Haiku is fast and cheap. Override with TTAP_INTERPRETER_MODEL.
+MODEL = os.environ.get("TTAP_INTERPRETER_MODEL", "claude-haiku-5-5")
+# Server-side refusal fallbacks exist for Sonnet/Opus/Fable, not for Haiku.
+_FALLBACK_KW = {} if "haiku" in MODEL else {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
 SYSTEM = f"""You convert a food-service buyer's purchase message into a structured request for a wholesaler.
 Rules:
 - Hard constraints (allergies, diets, 'must be organic') go to required_claims / required_labels using ONLY these codes.
@@ -32,13 +37,13 @@ class ClaudeInterpreter:
         response = await self._client.beta.messages.parse(
             model=MODEL,
             max_tokens=16000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            output_config={"effort": "low"},
             system=SYSTEM,
             messages=[{"role": "user", "content":
                        f"Today is {today.isoformat()} ({today.strftime('%A')}).\nBuyer's usual products:\n{usual_txt}"
                        f"\n\nMessage:\n{text}"}],
             output_format=InterpretedRequest,
+            **_FALLBACK_KW,
         )
         if response.stop_reason == "refusal" or response.parsed_output is None:
             raise ValueError(f"interpretation unavailable (stop_reason={response.stop_reason})")

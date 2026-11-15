@@ -1,11 +1,13 @@
 // Streams a buyer-side agent run (NDJSON) from the agent service to the browser, unbuffered.
 import type { NextRequest } from "next/server";
+import { limitLlm } from "@/lib/ratelimit";
 
 const AGENT = process.env.AGENT_URL ?? "http://localhost:8820";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ kind: string }> }): Promise<Response> {
   const { kind } = await ctx.params;
   if (!["claude", "bot"].includes(kind)) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
+  if (kind === "claude") { const limited = limitLlm(req, "agent"); if (limited) return limited; }
   try {
     const upstream = await fetch(`${AGENT}/run/${kind}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: await req.text(), cache: "no-store",

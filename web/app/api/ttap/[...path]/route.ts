@@ -3,6 +3,7 @@
 import type { NextRequest } from "next/server";
 import type { JWK } from "jose";
 import { verifyOffer } from "@/lib/verify";
+import { limitLlm } from "@/lib/ratelimit";
 
 const KEYS: Record<string, string | undefined> = {
   "agent-hotel": process.env.KEY_AGENT_HOTEL,
@@ -16,6 +17,7 @@ const GATEWAY = process.env.GATEWAY_URL ?? "http://localhost:8811";
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
   const { path } = await ctx.params;
   const target = `${GATEWAY}/${path.join("/")}${req.nextUrl.search}`;
+  if (req.method === "POST" && path.at(-1) === "interpret") { const limited = limitLlm(req, "interpret"); if (limited) return limited; }
   const headers: Record<string, string> = { "content-type": "application/json", "x-ttap-via": "web:console" };
   // the visitor's own (onboarded) key wins over demo roles
   const key = req.headers.get("x-ttap-key") ?? KEYS[req.headers.get("x-demo-role") ?? ""];

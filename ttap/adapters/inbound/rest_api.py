@@ -12,7 +12,7 @@ from typing import Protocol
 
 from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 from ttap.adapters.outbound.jws_signer import EcdsaSigner
 from ttap.application.approvals import ApprovalService
@@ -60,7 +60,7 @@ class Services:
 
 class InterpretBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    text: str
+    text: str = Field(max_length=1000)
 
 
 class ClockAdvance(BaseModel):

@@ -13,7 +13,7 @@ from datetime import date
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from buyer_agent.reference_agent import run_events
 from buyer_agent.replenishment_bot import DEMO_PAR_LEVELS, replenish
@@ -27,7 +27,7 @@ app = FastAPI(title="TTAP buyer agents")
 
 class RunBody(BaseModel):
     org: str = "hotel"
-    text: str = ""
+    text: str = Field("", max_length=400)  # a purchasing request is short; caps what a visitor can send to the LLM
     agent_key: str | None = None  # organisations onboarded in the console bring their own key
 
 

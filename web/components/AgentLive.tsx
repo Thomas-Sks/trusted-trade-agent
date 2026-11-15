@@ -105,6 +105,11 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
     setEvents([]); setDecision(null); setRunning(kind);
     try {
       const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org: org.id, text, agent_key: typeof org.agent === "string" ? undefined : org.agent.key }) });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEvents([{ type: "error", text: err.detail ?? `Agent service error (${res.status})` }]);
+        return;
+      }
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf = "";

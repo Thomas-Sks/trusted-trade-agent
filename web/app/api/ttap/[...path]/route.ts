@@ -16,7 +16,7 @@ const GATEWAY = process.env.GATEWAY_URL ?? "http://localhost:8811";
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
   const { path } = await ctx.params;
   const target = `${GATEWAY}/${path.join("/")}${req.nextUrl.search}`;
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = { "content-type": "application/json", "x-ttap-via": "web:console" };
   const key = KEYS[req.headers.get("x-demo-role") ?? ""];
   if (key) headers.authorization = `Bearer ${key}`;
   const idem = req.headers.get("idempotency-key");

@@ -77,7 +77,7 @@ def main() -> None:
     a = p.parse_args()
 
     async def loop() -> None:
-        client = TTAPClient(a.url, a.key)
+        client = TTAPClient(a.url, a.key, via="rest:replenishment-bot")
         while True:
             await replenish(client, DEMO_PAR_LEVELS, date.fromisoformat(a.delivery))
             if a.once:

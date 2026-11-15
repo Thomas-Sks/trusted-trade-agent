@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import AsyncIterator
 
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools.mcp import async_mcp_tool
@@ -40,6 +41,70 @@ def show(message) -> None:
             print(f"  → {block.name}({args[:160]}{'…' if len(args) > 160 else ''})", flush=True)
         elif block.type == "text" and block.text.strip():
             print(f"\n{block.text}\n", flush=True)
+
+
+class _RecordingSession:
+    """Wraps the MCP session so every tool result is also emitted as an event (for the live console)."""
+
+    def __init__(self, session: ClientSession, queue: asyncio.Queue):
+        self._session, self._queue = session, queue
+
+    async def call_tool(self, name, arguments=None, *args, **kwargs):
+        result = await self._session.call_tool(name, arguments, *args, **kwargs)
+        payload = getattr(result, "structured_content", None) or getattr(result, "structuredContent", None)
+        if payload is None and result.content:
+            try:
+                payload = json.loads(result.content[0].text)
+            except (ValueError, AttributeError):
+                payload = {"text": getattr(result.content[0], "text", "")}
+        if isinstance(payload, dict) and set(payload) == {"result"}:
+            payload = payload["result"]
+        await self._queue.put({"type": "tool_result", "tool": name, "result": payload})
+        return result
+
+    def __getattr__(self, item):
+        return getattr(self._session, item)
+
+
+async def run_events(text: str, agent_key: str, url: str) -> AsyncIterator[dict]:
+    """The reference agent as a stream of events: thinking, tool calls (MCP), tool results, final report."""
+    queue: asyncio.Queue = asyncio.Queue()
+    params = StdioServerParameters(command=sys.executable, args=["-m", "buyer_agent.mcp_server"],
+                                   env={**os.environ, "TTAP_URL": url, "TTAP_AGENT_KEY": agent_key})
+
+    async def drive() -> None:
+        try:
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    recording = _RecordingSession(session, queue)
+                    tools = (await session.list_tools()).tools
+                    await queue.put({"type": "start", "model": MODEL, "tools": [t.name for t in tools]})
+                    runner = AsyncAnthropic().beta.messages.tool_runner(
+                        model=MODEL, max_tokens=16000, output_config={"effort": "medium"},
+                        thinking={"type": "adaptive", "display": "summarized"}, system=SYSTEM,
+                        tools=[async_mcp_tool(t, recording) for t in tools],
+                        messages=[{"role": "user", "content": text}])
+                    async for message in runner:
+                        for block in message.content:
+                            if block.type == "thinking" and getattr(block, "thinking", ""):
+                                await queue.put({"type": "thinking", "text": block.thinking})
+                            elif block.type == "text" and block.text.strip():
+                                await queue.put({"type": "text", "text": block.text})
+                            elif block.type == "tool_use":
+                                await queue.put({"type": "tool_call", "tool": block.name, "input": block.input})
+        except Exception as exc:  # surfaced in the console instead of a silent failure
+            await queue.put({"type": "error", "text": f"{type(exc).__name__}: {exc}"})
+        finally:
+            await queue.put({"type": "done"})
+
+    task = asyncio.create_task(drive())
+    while True:
+        event = await queue.get()
+        yield event
+        if event["type"] == "done":
+            break
+    await task
 
 
 async def run(text: str, agent_key: str, url: str) -> None:

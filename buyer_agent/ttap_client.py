@@ -25,16 +25,19 @@ class TTAPError(Exception):
 
 
 class TTAPClient:
-    def __init__(self, base_url: str, agent_key: str, transport: httpx.AsyncBaseTransport | None = None):
+    def __init__(self, base_url: str, agent_key: str, transport: httpx.AsyncBaseTransport | None = None,
+                 via: str = "rest"):
         self._http = httpx.AsyncClient(base_url=base_url, transport=transport, timeout=60.0,
                                        headers={"Authorization": f"Bearer {agent_key}"})
         self._protocol: dict | None = None
+        self.via = via  # shown on the protocol wire, e.g. "mcp:lookup" or "rest:replenishment-bot"
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
     async def _call(self, method: str, path: str, **kw: Any) -> Any:
-        resp = await self._http.request(method, path, **kw)
+        headers = {**kw.pop("headers", {}), "X-TTAP-Via": self.via}
+        resp = await self._http.request(method, path, headers=headers, **kw)
         if resp.status_code >= 400:
             try:
                 body = resp.json()

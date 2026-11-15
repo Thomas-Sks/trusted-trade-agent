@@ -101,3 +101,13 @@ def test_preview_decides_without_committing_anything():
     assert preview == {"outcome": "PENDING_HUMAN", "rules_fired": ["total_over_order_limit"], "total_net": "1010.00"}
     assert c.get("/orders", headers=A).json() == []                       # nothing ordered
     assert c.post("/orders", json=body, headers=A | {"Idempotency-Key": "x"}).status_code == 202  # offer still usable
+
+
+def test_protocol_wire_records_channel_and_is_scoped():
+    c = client()
+    place(c)
+    c.get("/orders", headers=A | {"X-TTAP-Via": "mcp:get_order"})
+    wire = c.get("/trace", headers=A).json()
+    assert [w["path"] for w in wire][:3] == ["/requests", wire[1]["path"], "/orders"]
+    assert wire[-1]["via"] == "mcp:get_order" and all(w["org"] in ("org_a", None) for w in wire)
+    assert all(w["org"] != "org_a" for w in c.get("/trace", headers=B).json())

@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
+from collections import deque
+from itertools import count
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol
@@ -124,6 +127,22 @@ def create_app(services: Services, agent_keys: dict[str, str],
                 await lifecycle.stop()
 
     app = FastAPI(title="Trusted Trade Agent Protocol", version=PROTOCOL_VERSION, lifespan=lifespan)
+    trace: deque[dict] = deque(maxlen=1000)
+    seq = count(1)
+    key_owner = {k: v for k, v in agent_keys.items()} | {k: v[0] for k, v in approver_keys.items()}
+
+    @app.middleware("http")
+    async def wire_trace(request: Request, call_next):
+        """Protocol wire: every call, who made it and through which channel (MCP tool, REST client, web)."""
+        started = time.perf_counter()
+        response = await call_next(request)
+        path = request.url.path
+        if not path.startswith(("/trace", "/admin/state", "/docs", "/openapi")):
+            token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            trace.append({"id": next(seq), "time": time.time(), "method": request.method, "path": path,
+                          "status": response.status_code, "ms": round((time.perf_counter() - started) * 1000),
+                          "org": key_owner.get(token), "via": request.headers.get("x-ttap-via", "rest")})
+        return response
 
     @app.exception_handler(TTAPError)
     async def _problem(_: Request, exc: TTAPError) -> JSONResponse:
@@ -284,6 +303,10 @@ def create_app(services: Services, agent_keys: dict[str, str],
         events = services.auditor.log.list(org)
         problems = verify_chain(events, services.signer.public_jwk(), EcdsaSigner.verify_with_jwk)
         return {"org_id": org, "events": len(events), "valid": not problems, "problems": problems}
+
+    @app.get("/trace")
+    def wire(after: int = 0, org: str = Depends(any_org)) -> list[dict]:
+        return [t for t in trace if t["id"] > after and t["org"] in (org, None)][-200:]
 
     @app.get("/.well-known/ttap.json")
     def well_known() -> dict:

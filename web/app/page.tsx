@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { AgentLive } from "@/components/AgentLive";
 import { Approvals } from "@/components/Approvals";
 import { AuditLog } from "@/components/AuditLog";
 import { DemoMenu } from "@/components/DemoMenu";
@@ -9,6 +10,7 @@ import { Requests } from "@/components/Requests";
 import { ORGS, type Org } from "@/lib/api";
 
 const TABS = [
+  { key: "live", label: "Agent live" },
   { key: "new", label: "New request" },
   { key: "requests", label: "Orders" },
   { key: "approvals", label: "Approvals" },
@@ -19,7 +21,7 @@ type Tab = (typeof TABS)[number]["key"];
 
 export default function Home() {
   const [org, setOrg] = useState<Org>("hotel");
-  const [tab, setTab] = useState<Tab>("new");
+  const [tab, setTab] = useState<Tab>("live");
   const [pending, setPending] = useState(0);
   const onCount = useCallback((n: number) => setPending(n), []);
   useEffect(() => {
@@ -30,7 +32,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-white/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
           <div className="flex items-center gap-2.5">
             <div className="size-7 rounded-lg bg-gradient-to-br from-accent via-[#9b5cf6] to-[#ff7ab6]" />
             <span className="font-semibold tracking-tight">TTAP</span>
@@ -55,7 +57,8 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <div className={tab === "live" ? "" : "hidden"}><AgentLive org={org} /></div>
         <div className={tab === "new" ? "" : "hidden"}><NewRequest org={org} /></div>
         {tab === "requests" && <Requests org={org} />}
         <div className={tab === "approvals" ? "" : "hidden"}><Approvals org={org} onCount={onCount} /></div>

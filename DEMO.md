@@ -2,6 +2,12 @@
 
 **Before:** gateway + console running, Telegram paired (`/start PAIR-HOTEL-A`), demo menu → *Reset demo data*.
 
+0. **Watch the agent act (60 s) — open on this.** Agent live tab → *Run Claude agent (MCP)* with the free-text
+   request. The centre column shows Claude calling the MCP tools one by one (interpret → create_request → lookup →
+   place_order → explain_order) with what each returned; the right column, the **protocol wire**, shows every
+   request hitting the gateway, tagged with the MCP tool that caused it, and the lookup's extra call to
+   `/.well-known/ttap.json` = the buyer verifying the offer signature. The 4-step tracker lights up as it goes.
+   Then *Run replenishment bot (REST)*: same protocol, no LLM, tagged `REST · replenishment-bot`.
 1. **Request → auto-approved (45 s).** New request → scenario *Lactose-free milk*. Point at the tracker: Lookup turns
    green, *Signature verified* badge (checked in TypeScript, signed in Python). Recommended: the hotel's usual milk at
    €1.01/L, 128 products excluded with reasons. Place order → *Auto-approved within mandate*, Peppol `AP`.

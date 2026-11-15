@@ -8,17 +8,26 @@ services:
       - ./resources:/app/resources:ro
       - ttap-data:/data
     ports: ["8811:8811"]
+  agent:
+    build: .
+    command: ["uv", "run", "--no-dev", "uvicorn", "buyer_agent.agent_server:app", "--host", "0.0.0.0", "--port", "8820"]
+    env_file: .env
+    environment:
+      TTAP_URL: http://gateway:8811
+    depends_on: [gateway]
+    ports: ["8820:8820"]
   web:
     build: ./web
     environment:
       GATEWAY_URL: http://gateway:8811
+      AGENT_URL: http://agent:8820
       KEY_AGENT_HOTEL: demo-key-hotel-a
       KEY_AGENT_RESTO: demo-key-resto-b
       KEY_APPROVER_HOTEL: approver-key-hotel-a
       KEY_APPROVER_RESTO: approver-key-resto-b
       KEY_ADMIN: admin-key-valio
       NEXT_PUBLIC_TELEGRAM_BOT: ${TELEGRAM_BOT_USERNAME:-}
-    depends_on: [gateway]
+    depends_on: [gateway, agent]
     ports: ["3100:3100"]
 volumes:
   ttap-data:

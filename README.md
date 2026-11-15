@@ -44,12 +44,14 @@ cp .env.example .env            # set VALIO_API_KEY (and optionally ANTHROPIC_AP
 # datasets from the challenge portal into resources/ (not committed)
 uv sync
 uv run --env-file .env uvicorn ttap.main:app --port 8811          # gateway
+uv run --env-file .env uvicorn buyer_agent.agent_server:app --port 8820   # buyer-side agents (live view)
 (cd web && npm install && npx next dev --port 3100)                 # console → http://localhost:3100
 ```
 or `docker compose up --build`.
 
 | Try | Command |
 |---|---|
+| **Watch an agent act** | Console → *Agent live*: Claude's tool calls, results, and every gateway request on the protocol wire (`MCP · lookup`, `REST · replenishment-bot`) |
 | Claude agent over MCP | `uv run --env-file .env python -m buyer_agent.reference_agent "1000 L of lactose-free milk for Monday"` |
 | Plug Claude Desktop / Code | MCP stdio server: `python -m buyer_agent.mcp_server` with `TTAP_URL`, `TTAP_AGENT_KEY` |
 | Replenishment bot (no LLM) | `uv run python -m buyer_agent.replenishment_bot --key demo-key-resto-b --once` |
@@ -69,7 +71,7 @@ or `docker compose up --build`.
 ```
 ttap/            gateway: domain (pure), application (use cases), adapters (REST, Telegram, Valio, Cedar, SQLite, JWS, Claude)
 buyer_agent/     buyer side: verifying client, MCP server, Claude reference agent, replenishment bot
-web/             Next.js console (New request · Orders · Approvals · Mandate · Audit log)
+web/             Next.js console (Agent live · New request · Orders · Approvals · Mandate · Audit log)
 policies/        Cedar mandate policies
 conformance/     protocol conformance kit
 eval/            precision evaluation

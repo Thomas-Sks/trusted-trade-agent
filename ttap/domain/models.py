@@ -14,13 +14,18 @@ class Unit(StrEnum):
     PIECE = "PIECE"
 
 
+# Inputs from agents: unknown fields are rejected at every level, so nothing can be smuggled into a request or order.
+_INPUT = ConfigDict(extra="forbid")
+
+
 class Quantity(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
     value: Decimal = Field(gt=0)
     unit: Unit
 
 
 class Need(BaseModel):
+    model_config = _INPUT
     text: str
     required_claims: list[str] = []
     excluded_allergens: list[str] = []
@@ -29,6 +34,7 @@ class Need(BaseModel):
 
 
 class Preferences(BaseModel):
+    model_config = _INPUT
     origin: list[str] = []
     brands: list[str] = []
     labels: list[str] = []
@@ -38,6 +44,7 @@ SubstitutionPref = Literal["best_match", "no_substitute"]
 
 
 class RequestLine(BaseModel):
+    model_config = _INPUT
     line_id: str
     need: Need
     quantity: Quantity
@@ -46,6 +53,7 @@ class RequestLine(BaseModel):
 
 
 class Delivery(BaseModel):
+    model_config = _INPUT
     requested_date: date
     latest_acceptable_date: date
 
@@ -197,6 +205,7 @@ class OrderState(StrEnum):
 
 
 class SelectedLine(BaseModel):
+    model_config = _INPUT
     line_id: str
     tier: Tier
 

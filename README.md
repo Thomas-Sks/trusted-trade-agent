@@ -7,6 +7,8 @@ policy, human sign-off on Telegram or the web, and an audit trail both parties c
 > Not a chatbot over a webshop: the wholesaler publishes the protocol, any agent (LLM or plain script) can speak it,
 > and nothing an agent says can change a price, a quantity or an approval.
 
+**Live demo:** https://16-171-234-227.sslip.io (until 2026-11-18) — *Get started* to create your own organisation.
+
 ## What it does
 | Challenge requirement | TTAP |
 |---|---|
@@ -49,6 +51,11 @@ uv run --env-file .env uvicorn buyer_agent.agent_server:app --port 8820   # buye
 ```
 or `docker compose up --build`.
 
+**Hosted (single VM):** `deploy/compose.yml` — Caddy (automatic HTTPS) is the only published service; gateway and
+agent stay on the internal network with fresh random keys. Run from `deploy/` with
+`docker compose --env-file ../.env up -d --build`. LLM routes are rate-limited (per visitor and per day), inputs are
+length-capped, and the agent only handles purchasing requests.
+
 | Try | Command |
 |---|---|
 | **Onboard yourself** | Console → *Get started*: create an organisation, set its mandate, pair your phone via QR, run the agent |
@@ -66,7 +73,7 @@ or `docker compose up --build`.
 - **Conformance kit:** 10/10 MUST, 2/2 SHOULD.
 - **Interpreter** (Claude Haiku 5.5): FR/FI/EN free text → constraints in ~3 s, asks before guessing.
 - **What-if:** raising the per-order limit to €5,000 → "3 of 10 past orders would have changed decision".
-- **Tests:** 110 unit/integration tests.
+- **Tests:** 117 unit/integration tests.
 
 ## Repository
 ```

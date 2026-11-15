@@ -20,6 +20,7 @@ with a record both parties can verify.
 | `agent` | agent key (OAuth 2.1 in production) | request, lookup, order, preview, read own orders and audit |
 | `approver` | approver key / paired Telegram account | approve, reject, modify, pause/resume and simulate the mandate |
 | `seller_admin` | admin key | demo controls only (scenarios, clock, reset) |
+| *(public)* | none | self-service onboarding: create an organisation, which returns its agent and approver credentials |
 
 - The organisation MUST be derived from the credential, never from the body; unknown body fields MUST be rejected.
 - Cross-organisation access MUST return `404` (not `403`).
@@ -37,6 +38,8 @@ with a record both parties can verify.
 | Mandate | `GET /mandate`, `POST /mandate/pause|resume`, `POST /mandate/simulate` | kill switch and what-if replay |
 | Audit | `GET /audit`, `GET /audit/verify`, `GET /approvals/stats` | signed chain, verification, oversight quality |
 | Discovery | `GET /.well-known/ttap.json` | protocol, version, steps, JWKS |
+| Onboarding | `POST /onboarding/organisations`, `GET /onboarding/status` | self-service: organisation + mandate limits → agent key, approver key, Telegram pairing link; status reports pairing |
+| Observability | `GET /trace?after=` | the organisation's recent gateway calls, tagged with the client that made them (`X-TTAP-Via`: MCP tool, REST bot, console) |
 
 ## 4. Offers (trust protocol)
 - An offer MUST be signed: ES256 JWS over the RFC 8785 (JCS) canonical JSON of the offer without `signature`, key in the discovery JWKS. Buyers SHOULD verify before acting (reference: `buyer_agent/ttap_client.py`, `web/lib/verify.ts`).
@@ -72,6 +75,14 @@ CloudEvents 1.0 JSONL; fields `step`, `actor`, `outcome`, `data`, template-gener
 
 ## 12. Errors
 `application/problem+json` with stable `code`: `NOT_FOUND`, `UNAUTHORIZED`, `OFFER_EXPIRED`, `OFFER_ALREADY_USED`, `INVALID_OFFER_SIGNATURE`, `INVALID_SELECTION`, `IDEMPOTENCY_MISMATCH`, `CONFLICT`, `PRICE_LOCK_EXPIRED`, `STOCK_CHANGED`, `UPSTREAM_UNAVAILABLE`, `INTERPRETER_UNAVAILABLE`.
+LLM failures on step 0 keep the protocol usable and name their cause: `AI_CREDITS_EXHAUSTED`, `AI_KEY_INVALID`,
+`AI_RATE_LIMITED`, `AI_OVERLOADED`, `AI_UNAVAILABLE`.
+
+## 12 bis. Onboarding (operating model)
+A buyer organisation is created in one call: name, approver, mandate limits (per order, period budget, unverified
+stock, velocity). The gateway returns an agent key (for the buying agent), an approver key and a single-use Telegram
+pairing link. Pairing is optional: without it, approvals happen in the web console. A new organisation starts with no
+usual products and the default Cedar policies; its limits apply from the first order.
 
 ## 13. Path to production
 | Area | Prototype | Production |
@@ -81,6 +92,7 @@ CloudEvents 1.0 JSONL; fields `step`, `actor`, `outcome`, `data`, template-gener
 | Upstream | local throttle 8 req/s, batching, 60 s cache, stale fallback | shared throttle (Redis), shared cache, circuit breaker |
 | Notifications | best-effort Telegram | transactional outbox, at-least-once + idempotent consumers; WhatsApp/Teams adapters |
 | Stock | local reservation ledger | **reservation/commit endpoint at the wholesaler** |
+| LLM cost & abuse | per-visitor and daily caps on LLM routes, input length caps, purchasing-only agent | per-organisation quotas and billing, spend alerts |
 | Identity | static keys | OAuth 2.1 per organisation, RFC 9421 signed agent requests, verifiable agent mandates |
 | ERP | order ready to transmit | Peppol UBL Order / OrderResponse export, EDI ORDERS/ORDRSP |
 | Labels | supplier-declared | third-party attested (UN Transparency Protocol credentials, European Business Wallet) |

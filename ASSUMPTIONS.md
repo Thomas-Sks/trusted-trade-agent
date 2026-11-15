@@ -33,3 +33,5 @@ code, in an ADR, or flagged in the UI.
 | P3 | The stock reservation ledger protects only orders that go through this gateway; real protection needs a reservation endpoint on Valio's side. |
 | P4 | Simulated scenarios (shortage, price rise, outage, prompt injection, clock) are visibly flagged `SIMULATED` in offers, cards and the UI. |
 | P5 | The evaluation set (16 cases) is small and written by the team; it measures regressions, not market-wide accuracy. |
+| P6 | The hosted demo is public: anyone with the link can onboard, order and approve. LLM spend is bounded by per-visitor and daily caps, input length caps and a purchasing-only agent; demo state can be reset. |
+| P7 | Mandates are held in memory. Onboarded organisations are stored (SQLite) with the mandate set at onboarding, so a gateway restart restores those limits; a pause (kill switch) is not persisted and is lifted by a restart. Orders, reservations and the audit chain persist. |

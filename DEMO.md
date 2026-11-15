@@ -1,9 +1,12 @@
 # Demo script (5 minutes)
 
 **Self-service option (jury hands-on):** share the console URL. *Get started* → organisation name + approver →
-mandate limits (pre-filled) → scan the QR with the phone and press *Start* in Telegram (the screen turns to
-"Phone paired" by itself) → *Watch the agent buy*. Asking for 3,000 L of milk sends the approval card to the
-judge's own phone.
+mandate limits (pre-filled) → choose *On my phone (Telegram)* and scan the QR, or *In the web console only* →
+*Watch my agent buy*: the console opens Agent live with a request above the new limit already filled in. The approval
+card goes to the judge's own phone (or the Approvals tab); once decided, the agent view turns green by itself.
+
+**Fallbacks:** if the AI key runs out of credit the console says so explicitly; lookup, orders, approvals and the
+replenishment bot (no AI) keep working. Each visitor gets 5 agent runs per 10 minutes.
 
 **Before:** gateway + console running, Telegram paired (`/start PAIR-HOTEL-A`), demo menu → *Reset demo data*.
 

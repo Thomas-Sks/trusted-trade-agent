@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Literal
@@ -202,6 +202,15 @@ class Order(BaseModel):
     total_net: Decimal
     decision: Decision | None = None
     idempotency_key: str
+    decided_at: datetime | None = None
+    mandate_version: int | None = None
+    approved_by: str | None = None
+    rejection_reason: str | None = None
+
+
+class UsualItem(BaseModel):
+    product_id: str
+    median_qty: Decimal
 
 
 class Mandate(BaseModel):
@@ -211,3 +220,54 @@ class Mandate(BaseModel):
     valid_until: datetime
     limit_per_order_net: Decimal
     max_unverified_value_net: Decimal
+    approval_timeout: timedelta = timedelta(hours=2)
+    step_up_above_net: Decimal = Decimal("5000")
+    usual_list: list[UsualItem] = []
+
+
+Step = Literal["request", "lookup", "order", "approval"]
+
+
+class AuditEvent(BaseModel):
+    specversion: Literal["1.0"] = "1.0"
+    id: str
+    source: str = "urn:ttap:gateway"
+    type: str
+    subject: str
+    time: datetime
+    datacontenttype: str = "application/json"
+    org_id: str
+    step: Step
+    actor: str
+    outcome: str
+    data: dict[str, Any] = {}
+    explanation: str = ""
+    prev_hash: str | None = None
+    hash: str | None = None
+    signature: str | None = None
+
+
+class CardLine(BaseModel):
+    name: str
+    qty_sales_units: Decimal
+    sales_unit: str
+    unit_net: Decimal
+    line_total_net: Decimal
+    stock: StockStatus
+    changes: list[str]
+    vs_usual: str | None
+
+
+class ApprovalCard(BaseModel):
+    order_id: str
+    org_id: str
+    version: int
+    offer_hash_short: str
+    total_net: Decimal
+    total_gross: Decimal
+    reasons: list[str]
+    lines: list[CardLine]
+    warnings: list[str]
+    delivery_date: date | None
+    minutes_to_cutoff: int | None
+    step_up_required: bool

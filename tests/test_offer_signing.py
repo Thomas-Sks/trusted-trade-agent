@@ -35,3 +35,19 @@ def test_public_jwk_has_kid_and_no_private_part():
 
 def test_valid_until_is_capped_by_ttl_when_no_line_constraints():
     assert offer_valid_until(DEMO_NOW, timedelta(minutes=30), []) == DEMO_NOW + timedelta(minutes=30)
+
+
+def test_key_is_persisted_and_reloaded(tmp_path):
+    path = tmp_path / "key.json"
+    first = EcdsaSigner.load_or_create(path)
+    token = first.sign({"a": 1})
+    second = EcdsaSigner.load_or_create(path)
+    assert second.verify({"a": 1}, token)
+    assert second.public_jwk() == first.public_jwk()
+
+
+def test_verify_with_public_jwk_only():
+    signer = EcdsaSigner()
+    token = signer.sign({"a": 1})
+    assert EcdsaSigner.verify_with_jwk(signer.public_jwk(), {"a": 1}, token)
+    assert not EcdsaSigner.verify_with_jwk(signer.public_jwk(), {"a": 2}, token)

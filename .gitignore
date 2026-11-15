@@ -6,3 +6,4 @@ __pycache__/
 .env
 resources/*.json
 resources/*.csv
+ttap_signing_key.json

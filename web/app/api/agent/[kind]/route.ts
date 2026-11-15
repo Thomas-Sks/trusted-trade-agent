@@ -7,12 +7,17 @@ const AGENT = process.env.AGENT_URL ?? "http://localhost:8820";
 export async function POST(req: NextRequest, ctx: { params: Promise<{ kind: string }> }): Promise<Response> {
   const { kind } = await ctx.params;
   if (!["claude", "bot"].includes(kind)) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
-  if (kind === "claude") { const limited = limitLlm(req, "agent"); if (limited) return limited; }
+  const body = await req.text();
+  if (kind === "claude") {
+    const text = (() => { try { return String(JSON.parse(body).text ?? ""); } catch { return ""; } })();
+    if (text.length > 400) return Response.json({ code: "TOO_LONG", detail: "Please keep the purchasing request under 400 characters." }, { status: 413 });
+    const limited = limitLlm(req, "agent"); if (limited) return limited;
+  }
   try {
     const upstream = await fetch(`${AGENT}/run/${kind}`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: await req.text(), cache: "no-store",
+      method: "POST", headers: { "content-type": "application/json" }, body, cache: "no-store",
     });
-    return new Response(upstream.body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
+    return new Response(upstream.body, { status: upstream.status, headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
   } catch {
     return Response.json({ code: "AGENT_UNREACHABLE", detail: AGENT }, { status: 502 });
   }

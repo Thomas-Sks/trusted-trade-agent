@@ -78,6 +78,7 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
   const [running, setRunning] = useState<string | null>(null);
   const [wire, setWire] = useState<Wire[]>([]);
   const [showConsole, setShowConsole] = useState(false);
+  const [decision, setDecision] = useState<{ state?: string; approved_by?: string | null } | null>(null);
   const cursor = useRef(0);
   const feed = useRef<HTMLDivElement>(null);
 
@@ -101,7 +102,7 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
   }, [launch]);
 
   async function run(kind: "claude" | "bot") {
-    setEvents([]); setRunning(kind);
+    setEvents([]); setDecision(null); setRunning(kind);
     try {
       const res = await fetch(`/api/agent/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org: org.id, text, agent_key: typeof org.agent === "string" ? undefined : org.agent.key }) });
       const reader = res.body!.getReader();
@@ -121,7 +122,21 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
 
   // flow tracker from the agent's own actions
   const called = new Set(events.filter((e) => e.type === "tool_call").map((e) => STEP_OF[e.tool ?? ""]));
-  const order = events.find((e) => e.type === "tool_result" && e.tool === "place_order")?.result as { state?: string } | undefined;
+  const placed = events.find((e) => e.type === "tool_result" && e.tool === "place_order")?.result as { order_id?: string; state?: string } | undefined;
+  const order = placed && decision ? { ...placed, ...decision } : placed;
+  const pendingId = placed?.state === "PENDING_HUMAN" && !decision ? placed.order_id : undefined;
+  useEffect(() => {  // the agent stops at "pending": follow the order until a human decides (Telegram or web)
+    if (!pendingId) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const o = await api<{ state?: string; approved_by?: string | null }>(org.agent, `orders/${pendingId}`);
+        if (alive && o.state && o.state !== "PENDING_HUMAN") setDecision({ state: o.state, approved_by: o.approved_by });
+      } catch { /* gateway restarting */ }
+    };
+    const id = setInterval(tick, 2000);
+    return () => { alive = false; clearInterval(id); };
+  }, [pendingId, org]);
   const lookupDone = events.some((e) => e.type === "tool_result" && e.tool === "lookup");
   const state = (k: string, done: boolean): FlowStep["state"] => (done ? "done" : called.has(k) ? "active" : "todo");
   const approval: FlowStep["state"] = !order ? "todo" : ["AUTO_APPROVED", "APPROVED"].includes(order.state ?? "") ? "done" : order.state === "PENDING_HUMAN" ? "waiting" : "blocked";
@@ -186,6 +201,13 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
               if (e.type === "text") return <div key={i} className="animate-in whitespace-pre-wrap rounded-lg bg-white px-3 py-2.5 text-sm ring-1 ring-line">{e.text}</div>;
               return null;
             })}
+            {pendingId && <div className="animate-in flex items-center gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><span className="size-2 animate-ping rounded-full bg-warn" />Waiting for a human decision — approve on the phone or in the Approvals tab.</div>}
+            {decision && (
+              <div className={`animate-in flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${decision.state === "APPROVED" ? "bg-ok-soft text-ok" : "bg-bad-soft text-bad"}`}>
+                {decision.state === "APPROVED" ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}
+                Decision received: <b>{decision.state?.replaceAll("_", " ").toLowerCase()}</b>{decision.approved_by ? ` by ${decision.approved_by}` : ""}.
+              </div>
+            )}
           </div>
         </Card>
 

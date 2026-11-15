@@ -5,7 +5,7 @@ import {api, euro, num, type OrgProfile } from "@/lib/api";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
-type Ev = { type: string; text?: string; tool?: string; input?: Record<string, unknown>; result?: unknown; model?: string; tools?: string[] };
+type Ev = { type: string; code?: string; text?: string; tool?: string; input?: Record<string, unknown>; result?: unknown; model?: string; tools?: string[] };
 type Wire = { id: number; time: number; method: string; path: string; status: number; ms: number; via: string };
 
 const DEFAULT = "We need 1,000 litres of lactose-free milk for Monday, Finnish if possible.";
@@ -201,6 +201,13 @@ export function AgentLive({ org, launch }: { org: OrgProfile; launch?: Launch | 
               );
               if (e.type === "tool_result") return (
                 <div key={i} className="animate-in ml-5 border-l-2 border-ok/40 pl-3"><div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-ok"><CheckCircle2 className="size-3" />{e.tool} returned</div><ResultView tool={e.tool ?? ""} result={e.result} /></div>
+              );
+              if (e.type === "error" && e.code === "AI_CREDITS_EXHAUSTED") return (
+                <div key={i} className="animate-in rounded-lg border border-bad/30 bg-bad-soft px-4 py-3 text-sm text-bad">
+                  <div className="flex items-center gap-2 font-semibold"><CircleAlert className="size-4" />AI credit exhausted</div>
+                  <div className="mt-1">{e.text}</div>
+                  <div className="mt-1 text-xs">Operator: top up the Anthropic account (Console → Billing), then run again.</div>
+                </div>
               );
               if (e.type === "error") return <div key={i} className="animate-in flex gap-2 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad"><CircleAlert className="mt-0.5 size-4" />{e.text}</div>;
               if (e.type === "text") return <div key={i} className="animate-in whitespace-pre-wrap rounded-lg bg-white px-3 py-2.5 text-sm ring-1 ring-line">{e.text}</div>;

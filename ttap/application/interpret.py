@@ -34,7 +34,9 @@ class InterpretService:
         try:
             interp = await self._interpreter.interpret(text, self._clock.now().date(), usual)
         except Exception as exc:  # LLM failures never break the protocol: the buyer can still send a Request
-            raise InterpreterUnavailable(str(exc)) from exc
+            err = InterpreterUnavailable(str(exc))
+            err.code = getattr(exc, "code", None) or err.code  # e.g. AI_CREDITS_EXHAUSTED from the adapter
+            raise err from exc
         lines, delivery = to_request(interp)
         draft = {"lines": [ln.model_dump(mode="json") for ln in lines], "delivery": delivery.model_dump(mode="json"),
                  "assumptions": interp.assumptions, "questions": interp.questions}

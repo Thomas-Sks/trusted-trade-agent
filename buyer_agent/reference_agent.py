@@ -13,10 +13,13 @@ import os
 import sys
 from collections.abc import AsyncIterator
 
+import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools.mcp import async_mcp_tool
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
+
+from ttap.adapters.outbound.llm_errors import describe_llm_error
 
 MODEL = os.environ.get("TTAP_AGENT_MODEL", "claude-sonnet-5-5")
 SYSTEM = """You are the purchasing agent of a hotel kitchen. You buy from a food-service wholesaler only through
@@ -96,7 +99,14 @@ async def run_events(text: str, agent_key: str, url: str) -> AsyncIterator[dict]
                             elif block.type == "tool_use":
                                 await queue.put({"type": "tool_call", "tool": block.name, "input": block.input})
         except Exception as exc:  # surfaced in the console instead of a silent failure
-            await queue.put({"type": "error", "text": f"{type(exc).__name__}: {exc}"})
+            root: BaseException = exc
+            while isinstance(root, BaseExceptionGroup) and root.exceptions:  # anyio task groups wrap errors
+                root = root.exceptions[0]
+            if isinstance(root, anthropic.APIError):
+                code, text_ = describe_llm_error(root)
+                await queue.put({"type": "error", "code": code, "text": text_})
+            else:
+                await queue.put({"type": "error", "text": f"{type(exc).__name__}: {exc}"})
         finally:
             await queue.put({"type": "done"})
 

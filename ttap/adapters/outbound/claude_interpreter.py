@@ -7,6 +7,7 @@ import os
 
 import anthropic
 
+from ttap.adapters.outbound.llm_errors import LLMFailure
 from ttap.domain.interpretation import CLAIM_CODES, LABEL_CODES, InterpretedRequest
 
 # Simple extraction: Haiku is fast and cheap. Override with TTAP_INTERPRETER_MODEL.
@@ -34,7 +35,16 @@ class ClaudeInterpreter:
 
     async def interpret(self, text: str, today: date, usual: list[tuple[str, str]]) -> InterpretedRequest:
         usual_txt = "\n".join(f"- {pid}: {name}" for pid, name in usual) or "- (none)"
-        response = await self._client.beta.messages.parse(
+        try:
+            response = await self._parse(text, today, usual_txt)
+        except anthropic.APIError as exc:
+            raise LLMFailure(exc) from exc
+        if response.stop_reason == "refusal" or response.parsed_output is None:
+            raise ValueError(f"interpretation unavailable (stop_reason={response.stop_reason})")
+        return response.parsed_output
+
+    async def _parse(self, text: str, today: date, usual_txt: str):
+        return await self._client.beta.messages.parse(
             model=MODEL,
             max_tokens=16000,
             output_config={"effort": "low"},
@@ -45,6 +55,3 @@ class ClaudeInterpreter:
             output_format=InterpretedRequest,
             **_FALLBACK_KW,
         )
-        if response.stop_reason == "refusal" or response.parsed_output is None:
-            raise ValueError(f"interpretation unavailable (stop_reason={response.stop_reason})")
-        return response.parsed_output

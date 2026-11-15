@@ -51,3 +51,28 @@ def test_without_llm_the_protocol_still_works_and_interpret_says_so():
     c, _ = app(None)
     r = c.post("/interpret", json={"text": "x"}, headers=A)
     assert r.status_code == 503 and r.json()["code"] == "INTERPRETER_UNAVAILABLE"
+
+
+class BrokeInterpreter:
+    async def interpret(self, text, today, usual):
+        import anthropic
+        import httpx
+        from ttap.adapters.outbound.llm_errors import LLMFailure
+        req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        raise LLMFailure(anthropic.BadRequestError("Your credit balance is too low to access the Anthropic API.",
+                                                   response=httpx.Response(400, request=req), body=None))
+
+
+def test_exhausted_credit_reaches_the_client_as_its_own_code():
+    client, _ = app(BrokeInterpreter())
+    r = client.post("/interpret", json={"text": "1000 L milk"}, headers=A)
+    assert r.status_code == 503
+    assert r.json()["code"] == "AI_CREDITS_EXHAUSTED"
+    assert "no credit left" in r.json()["detail"]
+
+
+def test_overlong_interpret_text_is_rejected_before_the_llm():
+    fake = FakeInterpreter()
+    client, _ = app(fake)
+    assert client.post("/interpret", json={"text": "x" * 1001}, headers=A).status_code == 422
+    assert fake.seen is None

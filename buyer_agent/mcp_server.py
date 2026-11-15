@@ -39,7 +39,8 @@ def _summary(offer: dict) -> dict:
         return {k: c[k] for k in ("product_id", "name", "qty_sales_units", "sales_unit", "unit_net",
                                   "line_total_net", "comparison_net", "stock", "delivery_date",
                                   "changes_vs_request", "partial", "origins", "reliability")}
-    return {"untrusted_fields": ["name"], "offer_id": offer["offer_id"], "valid_until": offer["valid_until"],
+    return {"untrusted_fields": ["name"], "offer_id": offer["offer_id"], "request_id": offer.get("request_id"),
+            "valid_until": offer["valid_until"],
             "signature_verified": offer.get("signature_verified", False), "simulated": offer.get("simulated", []),
             "lines": [{"line_id": ln["line_id"], "exceptions": ln["exceptions"],
                        "tiers": {t: cand(c) for t, c in ln["tiers"].items()},
@@ -92,7 +93,8 @@ async def place_order(offer_id: str, line_choices: dict[str, str]) -> dict:
     order = await _safe(via("place_order").place_order(offer_id, selected))
     if "error" in order:
         return order
-    return {k: order.get(k) for k in ("order_id", "state", "total_net", "decision", "order_response", "lock_until")}
+    return {k: order.get(k) for k in ("order_id", "offer_id", "state", "total_net", "decision", "order_response",
+                                      "lock_until")}
 
 
 @server.tool()
@@ -109,6 +111,21 @@ async def explain_order(order_id: str) -> list[str]:
         return [str(events)]
     return [f"[{e['step']}] {e['explanation']}" for e in events if order_id in e["subject"]
             or order_id in str(e.get("data", ""))]
+
+
+
+@server.tool()
+async def check_inventory() -> dict:
+    """The restaurant's own inventory (buyer side): items below their reorder point with the quantity to order to
+    get back to par, grouped by supplier category, and the delivery date. Only available when the kitchen service
+    runs next to this agent."""
+    url = os.environ.get("KITCHEN_URL")
+    if not url:
+        return {"error": "NO_INVENTORY", "detail": "no kitchen inventory is connected to this agent"}
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as h:
+        r = await h.post(f"{url}/kitchen/report", json={"agent_key": os.environ["TTAP_AGENT_KEY"]})
+        return r.json()
 
 
 if __name__ == "__main__":

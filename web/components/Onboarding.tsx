@@ -38,22 +38,23 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
   const [limits, setLimits] = useState<Record<string, string>>(Object.fromEntries(LIMITS.map((l) => [l.key, l.value])));
   const [created, setCreated] = useState<Created | null>(null);
   const [paired, setPaired] = useState(false);
+  const [useTelegram, setUseTelegram] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (step !== 2 || !created || paired) return;
+    if (step !== 2 || !created || paired || !useTelegram) return;
     const id = setInterval(async () => {
       try { const s = await api<{ telegram_paired: boolean }>({ key: created.approver_key }, "onboarding/status"); if (s.telegram_paired) setPaired(true); } catch { /* retry */ }
     }, 1500);
     return () => clearInterval(id);
-  }, [step, created, paired]);
+  }, [step, created, paired, useTelegram]);
 
   async function create() {
     setBusy(true); setError(null);
     try {
       const org = await api<Created>("public", "onboarding/organisations", { body: { name, approver_name: approver, ...limits } });
-      setCreated(org);
+      setCreated(org); setUseTelegram(!!org.telegram_link);
       onCreated({ id: org.org_id, label: org.name, agent: { key: org.agent_key }, approver: { key: org.approver_key },
         approverName: org.approver_name, pairing: org.pairing_code, telegramLink: org.telegram_link,
         limit: `€${Number(limits.limit_per_order_net).toLocaleString("en-IE")} / order`, custom: true });
@@ -109,22 +110,33 @@ export function Onboarding({ onCreated, onReady }: { onCreated: (o: OrgProfile) 
 
       {step === 2 && created && (
         <Card className="animate-in space-y-5 p-6">
-          <div className="flex items-center gap-2 font-semibold"><Smartphone className="size-5 text-accent" />Connect your phone</div>
-          {created.telegram_link ? (
-            <div className="flex flex-col items-center gap-5 sm:flex-row">
+          <div className="flex items-center gap-2 font-semibold"><Smartphone className="size-5 text-accent" />How do you want to approve orders?</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { on: true, title: "On my phone (Telegram)", hint: "Approval cards with signed one-tap buttons", disabled: !created.telegram_link },
+              { on: false, title: "In the web console only", hint: "No phone needed — use the Approvals tab", disabled: false },
+            ].map((o) => (
+              <button key={o.title} disabled={o.disabled} onClick={() => setUseTelegram(o.on)}
+                className={`rounded-xl border px-4 py-3 text-left transition disabled:opacity-40 ${useTelegram === o.on ? "border-accent bg-accent-soft/40 ring-4 ring-accent/10" : "border-line hover:border-accent/50"}`}>
+                <div className="text-sm font-semibold">{o.title}</div>
+                <div className="text-xs text-muted">{o.disabled ? "Telegram is not configured on this server" : o.hint}</div>
+              </button>
+            ))}
+          </div>
+          {useTelegram && created.telegram_link && (
+            <div className="animate-in flex flex-col items-center gap-5 sm:flex-row">
               <div className="rounded-xl bg-white p-3 ring-1 ring-line"><QRCodeSVG value={created.telegram_link} size={150} fgColor="#17162b" /></div>
               <div className="space-y-3 text-sm">
                 <p>Scan with your phone camera (or tap the button on mobile), then press <b>Start</b> in Telegram. Approval requests will arrive there with one-time signed buttons.</p>
                 <a href={created.telegram_link} target="_blank" rel="noreferrer"><Button variant="secondary"><Smartphone className="size-4" />Open Telegram</Button></a>
                 <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${paired ? "bg-ok-soft text-ok" : "bg-page text-muted"}`}>
-                  {paired ? <><Check className="size-4" /><b>Phone paired</b> — you will be asked here when needed.</> : <><Loader2 className="size-4 animate-spin" />Waiting for your phone…</>}
+                  {paired ? <><Check className="size-4" /><b>Phone paired</b> — you will be asked here when needed.</> : <><Loader2 className="size-4 animate-spin" />Waiting for your phone… (you can also continue and pair later)</>}
                 </div>
               </div>
             </div>
-          ) : <p className="text-sm text-muted">Telegram is not configured on this server: approvals happen in the web console.</p>}
-          <div className="flex justify-end gap-2">
-            {!paired && <Button variant="ghost" onClick={() => onReady(Number(limits.limit_per_order_net), false)}>Skip — approve in the web console</Button>}
-            <Button disabled={!paired && !!created.telegram_link} onClick={() => onReady(Number(limits.limit_per_order_net), paired)}>
+          )}
+          <div className="flex justify-end">
+            <Button onClick={() => onReady(Number(limits.limit_per_order_net), useTelegram && paired)}>
               <Sparkles className="size-4" />Watch my agent buy <ArrowRight className="size-4" /></Button>
           </div>
         </Card>

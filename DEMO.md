@@ -1,5 +1,10 @@
 # Demo script (6 minutes)
 
+**Presenter vs visitors.** Open the console once as presenter with `?presenter=<code>` (the code is `PRESENTER_CODE`
+in the server `.env`): this unlocks the shared demo organisations and the Demo menu. Every other visitor lands on the
+Kitchen of their own private *My Bistro*, so nobody changes what the next person sees; *Approve on my phone* pairs
+their own Telegram.
+
 **Self-service option (jury hands-on):** share the console URL. *Get started* → organisation name + approver →
 mandate limits (pre-filled) → choose *On my phone (Telegram)* and scan the QR, or *In the web console only* →
 *Watch my agent buy*: the console opens Agent live with a request above the new limit already filled in. The approval
@@ -10,7 +15,7 @@ replenishment bot (no AI) keep working. Each visitor gets 5 agent runs per 10 mi
 
 **Before:** gateway + console running, Telegram paired (`/start PAIR-HOTEL-A`), demo menu → *Reset demo data*.
 
-0. **The kitchen restocks itself (75 s) — open on this.** Org *Bistro Bruno*, tab *Kitchen* → *Reset*, then
+0. **The kitchen restocks itself (75 s) — open on this.** *My Bistro* (or *Bistro Bruno* as presenter), tab *Kitchen* → *Reset*, then
    *Dinner service*: milk, cream, tomatoes, lettuce, chicken drop below their reorder points. *Restock with Claude*:
    the agent calls `check_inventory`, places **one order per supplier category**, and the mandate decides each:
    Produce and Meat & fish are **auto-approved**; Dairy waits for a human because the 10 L cooking cream is

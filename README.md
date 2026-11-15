@@ -7,7 +7,7 @@ policy, human sign-off on Telegram or the web, and an audit trail both parties c
 > Not a chatbot over a webshop: the wholesaler publishes the protocol, any agent (LLM or plain script) can speak it,
 > and nothing an agent says can change a price, a quantity or an approval.
 
-**Live demo:** https://16-171-234-227.sslip.io (until 2026-11-18) — *Get started* to create your own organisation.
+**Live demo:** https://16-171-234-227.sslip.io (until 2026-11-18) — opens on the Kitchen of your own private bistro; nothing you do changes what other visitors see.
 
 ## What it does
 | Challenge requirement | TTAP |

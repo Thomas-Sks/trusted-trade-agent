@@ -40,10 +40,12 @@ class Item:
 
 
 # A mini restaurant. Product ids are just the restaurant's usual products; nothing in TTAP depends on them.
+# Sized so that, however many services run, each category order stays under a bistro's €800 per-order limit: the only
+# order that needs a human is the one containing supplier-held cream that Valio cannot verify (> the €200 allowance).
 TEMPLATE = [
-    Item("milk", "Lactose-free milk", "Dairy", "464306", "L", 14, 30, 90, 9),
+    Item("milk", "Lactose-free milk", "Dairy", "464306", "L", 14, 30, 80, 9),
     Item("butter", "Butter 500 g", "Dairy", "464411", "PIECE", 9, 8, 24, 3),
-    Item("cream", "Cooking cream 10 L (supplier direct)", "Dairy", "464396", "PIECE", 1, 3, 9, 1),
+    Item("cream", "Cooking cream 10 L (supplier direct)", "Dairy", "464396", "PIECE", 1, 3, 8, 1),
     Item("tomatoes", "Cherry tomatoes", "Produce", "462545", "KG", 3, 8, 24, 3),
     Item("lettuce", "Iceberg lettuce", "Produce", "460026", "PIECE", 4, 10, 30, 6),
     Item("basil", "Basil bunch", "Produce", "460362", "PIECE", 12, 6, 16, 2),

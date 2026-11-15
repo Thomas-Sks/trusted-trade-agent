@@ -1,10 +1,10 @@
 "use client";
-import { ArrowRight, History, Scale } from "lucide-react";
+import { ArrowRight, History, Pause, Play, Scale } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError, api, euro, ORGS, type Org } from "@/lib/api";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
-interface MandateDoc { version: number; limit_per_order_net: string; max_unverified_value_net: string; period_budget_net: string | null; max_orders_per_hour: number | null }
+interface MandateDoc { version: number; status: string; limit_per_order_net: string; max_unverified_value_net: string; period_budget_net: string | null; max_orders_per_hour: number | null }
 interface Sim { replayed: number; changed: number; summary: string; note: string;
   changes: { order_id: string; total_net: string; before: string; after: string; rules_before: string[]; rules_after: string[] }[] }
 
@@ -30,6 +30,11 @@ export function Mandate({ org }: { org: Org }) {
     }).catch(() => setCurrent(null));
   }, [role]);
 
+  async function toggle() {
+    if (!current) return;
+    setCurrent(await api<MandateDoc>(role, current.status === "active" ? "mandate/pause" : "mandate/resume", { method: "POST", body: {} }));
+  }
+
   async function simulate() {
     setError(null);
     const body = Object.fromEntries(Object.entries(draft).filter(([k, v]) => v !== "" && v !== String(current?.[k as keyof MandateDoc] ?? "")));
@@ -45,6 +50,17 @@ export function Mandate({ org }: { org: Org }) {
           <div><div className="font-semibold">Mandate of {ORGS[org].label}</div>
             <div className="text-xs text-muted">Version {current?.version ?? "—"} · enforced by Cedar policies</div></div>
         </div>
+        {current && (
+          <div className={`flex items-center justify-between rounded-lg px-3 py-2.5 ${current.status === "active" ? "bg-ok-soft" : "bg-bad-soft"}`}>
+            <div className="text-sm">
+              <div className={`font-semibold ${current.status === "active" ? "text-ok" : "text-bad"}`}>{current.status === "active" ? "Agents may order" : "Mandate paused"}</div>
+              <div className="text-xs text-muted">{current.status === "active" ? "Kill switch: stop all agent orders now" : "Every new order is denied"}</div>
+            </div>
+            <Button variant={current.status === "active" ? "bad" : "ok"} onClick={toggle}>
+              {current.status === "active" ? <><Pause className="size-4" />Pause</> : <><Play className="size-4" />Resume</>}
+            </Button>
+          </div>
+        )}
         {FIELDS.map((f) => (
           <label key={f.key} className="block">
             <span className="text-xs font-medium text-muted">{f.label}</span>

@@ -30,8 +30,9 @@ class BotReply:
 class ApprovalBotLogic:
     def __init__(self, store: SqliteStore, approvals: ApprovalService, pairing_codes: dict[str, tuple[str, str]],
                  clock: Clock, web_base_url: str | None = None, token_ttl: timedelta = timedelta(hours=2),
-                 new_token: Callable[[], str] = lambda: secrets.token_urlsafe(12)):
+                 new_token: Callable[[], str] = lambda: secrets.token_urlsafe(12), mandates=None):
         self.approvals = approvals
+        self._mandates = mandates
         self._store, self._pairing, self._clock = store, pairing_codes, clock
         self._web, self._ttl, self._new_token = web_base_url, token_ttl, new_token
 
@@ -84,3 +85,17 @@ class ApprovalBotLogic:
             return BotReply("rejected", status_html("rejected", approver.user_id))
         except TTAPError as exc:
             return BotReply("error", f"⚠️ <b>{escape(exc.code)}</b> : {escape(str(exc))}")
+
+    async def command(self, telegram_id: int, name: str) -> BotReply:
+        """/pause, /resume (kill switch) and /status for a paired approver."""
+        approver = self._store.approver_by_telegram(telegram_id)
+        if approver is None or self._mandates is None:
+            return BotReply("error", "🔒 Account not paired: open the pairing link first.")
+        if name in ("pause", "resume"):
+            m = self._mandates.set_status(approver.org_id, "suspended" if name == "pause" else "active", approver.user_id)
+            return BotReply("info", "⏸ <b>Mandate paused</b>: agents can no longer place orders. Send /resume to restart."
+                            if m.status == "suspended" else "▶️ <b>Mandate resumed</b>: agents can order again.")
+        m = self._mandates.get(approver.org_id)
+        pending = len(self.approvals.pending(approver.org_id))
+        return BotReply("info", f"📋 <b>{escape(approver.org_id)}</b> · mandate v{m.version} · <b>{m.status}</b>\n"
+                                f"Per-order limit €{m.limit_per_order_net} · {pending} pending approval(s)")

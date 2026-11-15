@@ -30,6 +30,17 @@ class MandateService:
             raise NotFound(f"mandate for {org_id}")
         return mandate
 
+    def set_status(self, org_id: str, status: str, by: str) -> Mandate:
+        """Kill switch (AI Act art. 14-style 'stop button'): a suspended mandate makes every order DENIED."""
+        updated = self.get(org_id).model_copy(update={"status": status})
+        self._mandates.save(updated)
+        verb = "paused" if status == "suspended" else "resumed"
+        self._auditor.record(org_id=org_id, step="approval", action=f"mandate_{verb}", subject=f"mandate/{org_id}",
+                             actor=f"approver:{by}", outcome=status,
+                             explanation=f"Mandate {verb} by {by}: agents can{'not' if status == 'suspended' else ''} "
+                                         f"place orders{'' if status == 'suspended' else ' again'}")
+        return updated
+
     def simulate(self, org_id: str, changes: MandateChanges) -> SimulationResult:
         candidate = self.get(org_id).model_copy(update=changes.model_dump(exclude_none=True))
         decided = [e for e in self._auditor.log.list(org_id) if e.type == "org.ttap.approval.decided.v1"]

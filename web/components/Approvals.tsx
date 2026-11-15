@@ -1,5 +1,5 @@
 "use client";
-import { Check, Inbox, Smartphone, X } from "lucide-react";
+import { Check, Gauge, Inbox, Smartphone, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useState } from "react";
 import { api, dateTime, euro, num, ORGS, type Org } from "@/lib/api";
@@ -19,6 +19,7 @@ export function Approvals({ org, onCount }: { org: Org; onCount: (n: number) => 
   const [items, setItems] = useState<{ order: Order; card: ApprovalCard }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stats, setStats] = useState<{ summary: string; rubber_stamp_risk: boolean; approved_under_5s_pct: number | null } | null>(null);
   const role = ORGS[org].approver;
 
   const load = useCallback(async () => {
@@ -26,6 +27,7 @@ export function Approvals({ org, onCount }: { org: Org; onCount: (n: number) => 
       const pending = await api<Order[]>(role, "approvals");
       const rows = await Promise.all(pending.map(async (order) => ({ order, card: await api<ApprovalCard>(role, `orders/${order.order_id}/card`) })));
       setItems(rows); onCount(rows.length);
+      setStats(await api(role, "approvals/stats"));
     } catch { /* gateway restarting */ }
   }, [role, onCount]);
 
@@ -63,6 +65,15 @@ export function Approvals({ org, onCount }: { org: Org; onCount: (n: number) => 
             </ul>
           )}
         </Card>
+        {stats && (
+          <Card className={`flex gap-3 p-4 ${stats.rubber_stamp_risk ? "ring-2 ring-warn/40" : ""}`}>
+            <Gauge className={`mt-0.5 size-5 shrink-0 ${stats.rubber_stamp_risk ? "text-warn" : "text-muted"}`} />
+            <div className="text-xs text-muted">
+              <div className="mb-0.5 text-sm font-semibold text-ink">Oversight quality</div>
+              {stats.summary}. Approving in seconds usually means not reading — the card shows facts, never the agent&apos;s advocacy.
+            </div>
+          </Card>
+        )}
         {BOT && (
           <Card className="flex items-center gap-4 p-4">
             <QRCodeSVG value={`https://t.me/${BOT}?start=${ORGS[org].pairing}`} size={72} fgColor="#17162b" />

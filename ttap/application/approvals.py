@@ -23,6 +23,7 @@ class ApprovalService:
                  auditor: Auditor, notifier: Notifier):
         self._store, self._policy, self._mandates = store, policy, mandates
         self._clock, self._auditor, self._notifier = clock, auditor, notifier
+        self._reminded: set[str] = set()
 
     def _load(self, org_id: str, order_id: str, expected_version: int | None) -> Order:
         order = self._store.get_order(org_id, order_id)
@@ -120,6 +121,22 @@ class ApprovalService:
             explanation=f"Modified by {approver}, re-evaluated: {explain_decision(done)}",
             data={"selected": [s.model_dump() for s in selected], "rules_fired": decision.rules_fired})
         return done
+
+    async def remind_overdue(self) -> list[Order]:
+        """Half-way through the price lock without a decision: notify every paired approver again (fallback)."""
+        now = self._clock.now()
+        reminded = []
+        for order in self._store.list_orders_by_state(OrderState.PENDING_HUMAN):
+            if order.order_id in self._reminded or order.lock_until is None or order.decided_at is None:
+                continue
+            if now >= order.decided_at + (order.lock_until - order.decided_at) / 2:
+                self._reminded.add(order.order_id)
+                await self._notifier.request_approval(order, self.card(order.org_id, order.order_id))
+                self._auditor.record(org_id=order.org_id, step="approval", action="reminded",
+                                     subject=f"order/{order.order_id}", actor="system", outcome="PENDING_HUMAN",
+                                     explanation=f"Approval overdue: reminder sent to all approvers of {order.org_id}")
+                reminded.append(order)
+        return reminded
 
     def expire_due(self) -> list[Order]:
         now = self._clock.now()

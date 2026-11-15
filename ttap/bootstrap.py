@@ -139,7 +139,7 @@ def build_live() -> LiveApp:
         pairing = parse_approver_entries(os.environ.get(
             "APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice,PAIR-RESTO-B:org_resto_b:chef_bruno"))
         telegram.bind(ApprovalBotLogic(store, services.approvals, pairing, clock,
-                                       web_base_url=os.environ.get("TTAP_PUBLIC_URL")))
+                                       web_base_url=os.environ.get("TTAP_PUBLIC_URL"), mandates=services.mandates))
     keys = parse_agent_keys(os.environ.get("AGENT_KEYS", "demo-key-hotel-a:org_hotel_a,demo-key-resto-b:org_resto_b"))
     approvers = parse_approver_entries(os.environ.get("APPROVER_KEYS", "approver-key-hotel-a:org_hotel_a:chef_alice,approver-key-resto-b:org_resto_b:chef_bruno"))
     return LiveApp(services, keys, approvers, telegram, os.environ.get("ADMIN_KEY", "admin-key-valio"))

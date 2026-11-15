@@ -37,6 +37,7 @@ class Clock(Protocol):
 
 class MandateRepository(Protocol):
     def get(self, org_id: str) -> Mandate | None: ...
+    def save(self, mandate: Mandate) -> None: ...
 
 
 class Store(Protocol):

@@ -7,3 +7,6 @@ class InMemoryMandates:
 
     def get(self, org_id: str) -> Mandate | None:
         return self._mandates.get(org_id)
+
+    def save(self, mandate: Mandate) -> None:
+        self._mandates[mandate.org_id] = mandate

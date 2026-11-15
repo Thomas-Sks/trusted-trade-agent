@@ -21,6 +21,7 @@ class TelegramNotifier:
         self._logic: ApprovalBotLogic | None = None
         self._app = Application.builder().token(token).build()
         self._app.add_handler(CommandHandler("start", self._on_start))
+        self._app.add_handler(CommandHandler(["pause", "resume", "status"], self._on_command))
         self._app.add_handler(CallbackQueryHandler(self._on_callback))
 
     def bind(self, logic: ApprovalBotLogic) -> None:
@@ -59,6 +60,12 @@ class TelegramNotifier:
         assert self._logic is not None
         code = context.args[0] if context.args else ""
         await update.message.reply_text(self._logic.link(update.effective_user.id, code), parse_mode=ParseMode.HTML)
+
+    async def _on_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        assert self._logic is not None
+        name = (update.message.text or "/status").split()[0].lstrip("/").split("@")[0]
+        reply = await self._logic.command(update.effective_user.id, name)
+        await update.message.reply_text(reply.html, parse_mode=ParseMode.HTML)
 
     async def _on_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         assert self._logic is not None

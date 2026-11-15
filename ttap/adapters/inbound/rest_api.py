@@ -106,6 +106,7 @@ def create_app(services: Services, agent_keys: dict[str, str],
         while True:
             await asyncio.sleep(expiry_interval_s)
             try:
+                await services.approvals.remind_overdue()
                 services.approvals.expire_due()
             except Exception:  # never let the loop die
                 log.exception("expiry sweep failed")
@@ -247,9 +248,22 @@ def create_app(services: Services, agent_keys: dict[str, str],
             await services.approvals.escalate(order)
         return order
 
+    @app.get("/approvals/stats")
+    def approval_stats(who: tuple[str, str] = Depends(approver)) -> dict:
+        from ttap.domain.oversight import oversight_stats
+        return oversight_stats(services.auditor.log.list(who[0])).model_dump()
+
     @app.get("/mandate")
     def get_mandate(who: tuple[str, str] = Depends(approver)) -> dict:
         return services.mandates.get(who[0]).model_dump(mode="json")
+
+    @app.post("/mandate/pause")
+    def pause_mandate(who: tuple[str, str] = Depends(approver)) -> dict:
+        return services.mandates.set_status(who[0], "suspended", who[1]).model_dump(mode="json")
+
+    @app.post("/mandate/resume")
+    def resume_mandate(who: tuple[str, str] = Depends(approver)) -> dict:
+        return services.mandates.set_status(who[0], "active", who[1]).model_dump(mode="json")
 
     @app.post("/mandate/simulate")
     def simulate_mandate(body: MandateChanges, who: tuple[str, str] = Depends(approver)) -> dict:

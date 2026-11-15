@@ -26,7 +26,7 @@ def data_for(buttons, label_prefix):
 
 async def test_pairing():
     env, logic, _ = await setup()
-    assert "alice" in logic.link(111, "PAIR-A")
+    assert "alice" in logic.link(111, "PAIR-A") and "Appairé" in logic.link(111, "PAIR-A")
     assert "inconnu" in logic.link(222, "WRONG")
     assert env.store.approver_chats("org_a") == [111]
 
@@ -37,17 +37,17 @@ async def test_click_by_paired_approver_approves_once():
     buttons = logic.buttons(order, approvals_card(logic, order))
     approve = data_for(buttons, "✅")
     assert len(approve) <= 64
-    assert "Approuvée" in await logic.handle(111, approve)
+    assert (await logic.handle(111, approve)).kind == "approved"
     assert env.store.get_order("org_a", order.order_id).state == OrderState.APPROVED
-    assert "expirée ou déjà utilisée" in await logic.handle(111, approve)
+    assert "déjà utilisée" in (await logic.handle(111, approve)).html
 
 
 async def test_unpaired_and_other_org_cannot_act():
     env, logic, order = await setup()
     logic.link(222, "PAIR-B")
     approve = data_for(logic.buttons(order, approvals_card(logic, order)), "✅")
-    assert "non appairé" in await logic.handle(999, approve)
-    assert "Non autorisé" in await logic.handle(222, approve)
+    assert "non appairé" in (await logic.handle(999, approve)).html
+    assert "Non autorisé" in (await logic.handle(222, approve)).html
     assert env.store.get_order("org_a", order.order_id).state == OrderState.PENDING_HUMAN
 
 
@@ -56,22 +56,24 @@ async def test_expired_token_refused():
     logic.link(111, "PAIR-A")
     approve = data_for(logic.buttons(order, approvals_card(logic, order)), "✅")
     env.clock.at = env.clock.at + timedelta(days=1)
-    assert "expirée" in await logic.handle(111, approve)
+    assert "expirée" in (await logic.handle(111, approve)).html
 
 
 async def test_reject_and_detail():
     env, logic, order = await setup()
     logic.link(111, "PAIR-A")
     buttons = logic.buttons(order, approvals_card(logic, order))
-    assert "Bloqué par" in await logic.handle(111, data_for(buttons, "🔎"))
-    assert "Rejetée" in await logic.handle(111, data_for(buttons, "❌"))
+    detail = await logic.handle(111, data_for(buttons, "🔎"))
+    assert detail.kind == "detail" and "<b>Pourquoi</b>" in detail.html and "stock vérifié" in detail.html
+    assert (await logic.handle(111, data_for(buttons, "❌"))).kind == "rejected"
     assert env.store.get_order("org_a", order.order_id).state == OrderState.REJECTED
 
 
 async def test_step_up_replaces_approve_callback_with_web_link():
     _, logic, order = await setup(step_up="100")
     buttons = logic.buttons(order, approvals_card(logic, order))
-    approve = next(b for b in buttons if b[0].startswith("✅"))
+    approve = buttons[0]
+    assert approve[0].startswith("🔐")
     assert approve[1] is None and approve[2].startswith("https://ttap.example/")
 
 

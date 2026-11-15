@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 from ttap.adapters.inbound.telegram_logic import ApprovalBotLogic
 from ttap.adapters.outbound.sqlite_store import SqliteStore
-from ttap.domain.approval_card import render_card_text
+from ttap.adapters.outbound.telegram_format import render_card_html
 from ttap.domain.models import ApprovalCard, Order
 
 log = logging.getLogger("ttap.telegram")
@@ -44,24 +45,28 @@ class TelegramNotifier:
             log.warning("no paired approver for %s: card for %s not delivered", order.org_id, order.order_id)
             return
         buttons = self._logic.buttons(order, card)
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton(label, url=url) if url else InlineKeyboardButton(label, callback_data=data)
-            for label, data, url in buttons if data or url
-        ]])
-        text = render_card_text(card)
+        usable = [(label, data, url) for label, data, url in buttons if data or url]
+        primary, secondary = usable[:2], usable[2:]
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(label, url=url) if url else InlineKeyboardButton(label, callback_data=data)
+             for label, data, url in row] for row in (primary, secondary) if row])
+        text = render_card_html(card)
         for chat_id in chats:
-            await self._app.bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+            await self._app.bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard,
+                                             parse_mode=ParseMode.HTML)
 
     async def _on_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         assert self._logic is not None
         code = context.args[0] if context.args else ""
-        await update.message.reply_text(self._logic.link(update.effective_user.id, code))
+        await update.message.reply_text(self._logic.link(update.effective_user.id, code), parse_mode=ParseMode.HTML)
 
     async def _on_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         assert self._logic is not None
         query = update.callback_query
         await query.answer()
-        result = await self._logic.handle(query.from_user.id, query.data or "")
-        if result.startswith(("✅", "❌")):
-            await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(result)
+        reply = await self._logic.handle(query.from_user.id, query.data or "")
+        if reply.kind in ("approved", "rejected"):
+            # update the card in place: status appended, buttons removed
+            await query.edit_message_text(f"{query.message.text_html}\n\n{reply.html}", parse_mode=ParseMode.HTML)
+        else:
+            await query.message.reply_text(reply.html, parse_mode=ParseMode.HTML)

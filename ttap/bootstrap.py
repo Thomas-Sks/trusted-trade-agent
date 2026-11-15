@@ -24,7 +24,7 @@ from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
-from ttap.domain.models import Mandate
+from ttap.domain.models import Mandate, UsualItem
 from ttap.ports import CatalogRepository, Clock, MandateRepository, Notifier, Signer, Store, SupplierGateway
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,8 +44,10 @@ def parse_agent_keys(raw: str) -> dict[str, str]:
 def demo_mandates() -> InMemoryMandates:
     until = DEMO_START + timedelta(days=60)
     return InMemoryMandates({
+        # usual_list is customer data (its order guide), not a rule: rules never reference product ids
         "org_hotel_a": Mandate(org_id="org_hotel_a", version=1, valid_until=until,
-                               limit_per_order_net=Decimal("2000"), max_unverified_value_net=Decimal("500")),
+                               limit_per_order_net=Decimal("2000"), max_unverified_value_net=Decimal("500"),
+                               usual_list=[UsualItem(product_id="464306", median_qty=Decimal("1000"))]),
         "org_resto_b": Mandate(org_id="org_resto_b", version=1, valid_until=until,
                                limit_per_order_net=Decimal("800"), max_unverified_value_net=Decimal("200")),
     })

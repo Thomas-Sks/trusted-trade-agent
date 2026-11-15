@@ -6,17 +6,25 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import timedelta
+from html import escape
 
 from ttap.adapters.outbound.sqlite_store import SqliteStore
+from ttap.adapters.outbound.telegram_format import render_card_html, status_html
 from ttap.application.approvals import ApprovalService
 from ttap.application.errors import TTAPError
-from ttap.domain.approval_card import render_card_text
 from ttap.domain.models import ActionToken, ApprovalCard, Order
 from ttap.ports import Clock
 
 Button = tuple[str, str | None, str | None]  # (label, callback_data, url)
 PREFIX = "t:"
+
+
+@dataclass
+class BotReply:
+    kind: str  # approved | rejected | detail | info | error
+    html: str
 
 
 class ApprovalBotLogic:
@@ -30,10 +38,11 @@ class ApprovalBotLogic:
     def link(self, telegram_id: int, code: str) -> str:
         ref = self._pairing.get(code.strip())
         if ref is None:
-            return "Code d'appairage inconnu."
+            return "❓ Code d'appairage inconnu."
         org_id, user_id = ref
         self._store.link_approver(telegram_id, org_id, user_id)
-        return f"Appairé : {user_id} pour {org_id}. Vous recevrez ici les demandes d'approbation."
+        return (f"🤝 <b>Appairé</b> : {escape(user_id)} pour <code>{escape(org_id)}</code>\n"
+                "Les demandes de validation arriveront ici.")
 
     def _token(self, order: Order, action: str) -> str:
         expires = self._clock.now() + self._ttl
@@ -46,32 +55,32 @@ class ApprovalBotLogic:
 
     def buttons(self, order: Order, card: ApprovalCard) -> list[Button]:
         if card.step_up_required:
-            approve: Button = ("✅ Approuver (web)", None,
+            approve: Button = ("🔐 Valider sur le web", None,
                                f"{self._web}/orders/{order.order_id}/review" if self._web else None)
         else:
             approve = ("✅ Approuver", self._token(order, "approve"), None)
-        return [approve, ("❌ Rejeter", self._token(order, "reject"), None),
-                ("🔎 Détail", self._token(order, "detail"), None)]
+        return [approve, ("❌ Refuser", self._token(order, "reject"), None),
+                ("🔎 Détails", self._token(order, "detail"), None)]
 
-    async def handle(self, telegram_id: int, data: str) -> str:
+    async def handle(self, telegram_id: int, data: str) -> BotReply:
         approver = self._store.approver_by_telegram(telegram_id)
         if approver is None:
-            return "Compte non appairé : envoyez /start <code> d'abord."
+            return BotReply("error", "🔒 Compte non appairé : ouvrez le lien d'appairage ou envoyez /start &lt;code&gt;.")
         token = self._store.get_action_token(data.removeprefix(PREFIX))
         if token is None or token.used or self._clock.now() >= token.expires_at:
-            return "Action expirée ou déjà utilisée."
+            return BotReply("error", "⌛ Action expirée ou déjà utilisée.")
         if token.org_id != approver.org_id:
-            return "Non autorisé pour cette organisation."
+            return BotReply("error", "🚫 Non autorisé pour cette organisation.")
         try:
             if token.action == "detail":
-                return render_card_text(self.approvals.card(token.org_id, token.order_id))
+                card = self.approvals.card(token.org_id, token.order_id)
+                return BotReply("detail", render_card_html(card, detailed=True))
             if not self._store.consume_action_token(token.token_id):
-                return "Action expirée ou déjà utilisée."
+                return BotReply("error", "⌛ Action expirée ou déjà utilisée.")
             if token.action == "approve":
                 done = self.approvals.approve(token.org_id, token.order_id, approver.user_id, token.version)
-                return f"✅ Approuvée par {approver.user_id} — {done.order_id} ({done.total_net} € HT)"
-            done = self.approvals.reject(token.org_id, token.order_id, approver.user_id, "rejet via Telegram",
-                                         token.version)
-            return f"❌ Rejetée par {approver.user_id} — {done.order_id}"
+                return BotReply("approved", status_html("approved", approver.user_id, done.total_net))
+            self.approvals.reject(token.org_id, token.order_id, approver.user_id, "refus via Telegram", token.version)
+            return BotReply("rejected", status_html("rejected", approver.user_id))
         except TTAPError as exc:
-            return f"⚠️ {exc.code} : {exc}"
+            return BotReply("error", f"⚠️ <b>{escape(exc.code)}</b> : {escape(str(exc))}")

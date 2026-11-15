@@ -9,7 +9,8 @@ RULE_TEXT: dict[str, str] = {
     "unverified_stock_over_limit": (
         "Stock fournisseur non vérifié : {unverified_value_net} € HT > limite {max_unverified_value_net} €"),
     "origin_conflict": "Origine contradictoire entre Valio et le fabricant",
-    "deviates_from_request": "Le choix s'écarte de la demande (origine ou marque)",
+    "deviates_from_request": "Le choix s'écarte de la demande (substitut, origine ou marque)",
+    "partial_fulfilment": "Disponibilité partielle : quantité demandée non couverte par le produit demandé",
     "mandate_not_active": "Mandat inactif, suspendu ou expiré",
     "policy_evaluation_error": "Erreur d'évaluation des règles : refus par défaut",
 }

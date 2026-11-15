@@ -15,7 +15,7 @@ MANDATE = Mandate(org_id="org_a", version=1, valid_until=DEMO_NOW + timedelta(da
 def ctx(**over):
     base = {"mandate_active": True, "total_net": Decimal("1010.00"), "limit_per_order_net": Decimal("2000"),
             "unverified_value_net": Decimal("0"), "max_unverified_value_net": Decimal("500"),
-            "has_origin_conflict": False, "has_changes_vs_request": False}
+            "has_origin_conflict": False, "has_changes_vs_request": False, "has_partial": False}
     return base | over
 
 

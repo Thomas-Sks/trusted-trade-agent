@@ -20,3 +20,7 @@ when { context.has_origin_conflict };
 @id("deviates_from_request")
 forbid (principal, action == Action::"auto_approve", resource)
 when { context.has_changes_vs_request };
+
+@id("partial_fulfilment")
+forbid (principal, action == Action::"auto_approve", resource)
+when { context.has_partial };

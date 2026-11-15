@@ -23,7 +23,8 @@ def _day(d: date) -> str:
 
 def _change(c: str) -> str:
     kind, _, value = c.partition(":")
-    return {"origin": f"🔁 origine {value.upper()}", "brand": f"🔁 marque {value}"}.get(kind, f"🔁 {c}")
+    return {"origin": f"🌍 origine {value.upper()}", "brand": f"🏷 marque {value}",
+            "substitute": f"🔁 substitut de {value}"}.get(kind, f"🔁 {c}")
 
 
 def render_card_html(card: ApprovalCard, detailed: bool = False) -> str:
@@ -35,7 +36,8 @@ def render_card_html(card: ApprovalCard, detailed: bool = False) -> str:
     for line in card.lines:
         rows.append(f"📦 <b>{e(shorten(line.name, 38 if not detailed else 80))}</b>")
         rows.append(f"      {qty(line.qty_sales_units)} × {money(line.unit_net)} € → <b>{money(line.line_total_net)} €</b>")
-        tags = ([f"📈 {line.vs_usual}"] if line.vs_usual else []) + [_change(c) for c in line.changes]
+        tags = (["✂️ partiel (stock)"] if line.partial else []) + \
+            ([f"📈 {line.vs_usual}"] if line.vs_usual else []) + [_change(c) for c in line.changes]
         if detailed:
             tags.append(STOCK_LABEL.get(line.stock, line.stock.value))
         if tags:

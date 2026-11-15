@@ -44,9 +44,11 @@ def test_exclusions_unit_mismatch_unavailable_insufficient_and_late():
              "T": stock("T", "9999999999", available_date=MONDAY.replace(day=20))}
     out = build_offer_line(line(), products, prices, avail, DELIVERY)
     reasons = {e.product_id: e.reason for e in out.excluded}
-    assert reasons == {"U": "COMPARISON_UNIT_MISMATCH", "X": "UNAVAILABLE",
-                       "S": "INSUFFICIENT_STOCK:24", "T": "DELIVERY_TOO_LATE"}
-    assert out.tiers == {} and out.exceptions == ["NO_ELIGIBLE_PRODUCT"]
+    assert reasons == {"U": "COMPARISON_UNIT_MISMATCH", "X": "UNAVAILABLE", "T": "DELIVERY_TOO_LATE"}
+    assert out.tiers == {}
+    assert [(c.product_id, c.qty_sales_units, c.partial) for c in out.split] == [("S", 24, True)]
+    assert out.backorder_qty == Decimal("976")
+    assert out.exceptions == ["PARTIAL_AVAILABILITY", "BACKORDER"]
 
 
 def test_unknown_supplier_stock_is_kept_and_flagged():
@@ -82,3 +84,40 @@ def test_catalog_from_files_loads_reliability_and_carbon(tmp_path):
     cat = JsonCatalog.from_files(tmp_path / "p.json", tmp_path / "r.csv", tmp_path / "c.csv")
     assert cat.get("1").reliability == Decimal("0.95") and cat.get("2").reliability is None
     assert cat.get("2").carbon_kg_per_kg == Decimal("3.5")
+
+
+def tomato_fixture(substitution="best_match"):
+    req = product("R", "Cherry tomato 4kg", sales_unit="KI", base_unit="KI", origin="ma", synkka_origins=("504",),
+                  substitutes=("S",))
+    sub = product("S", "Plum tomato 4kg", sales_unit="KI", base_unit="KI", origin="tn", synkka_origins=("788",))
+    ln = RequestLine(line_id="L1", need=Need(text="tomato", product_id="R"),
+                     quantity=Quantity(value=Decimal("2500"), unit=Unit.KG), substitution=substitution)
+    prices = {"R": price("R", "18.60", "4.65", "KG"), "S": price("S", "19.32", "4.83", "KG")}
+    avail = {"R": stock("R", "546"), "S": stock("S", "306")}
+    return ln, [req, sub], prices, avail, req
+
+
+def test_partial_requested_product_is_completed_by_official_substitute_then_backordered():
+    ln, products, prices, avail, req = tomato_fixture()
+    out = build_offer_line(ln, products, prices, avail, DELIVERY, requested=req)
+    plan = [(c.product_id, c.qty_sales_units, c.is_substitute) for c in out.split]
+    assert plan == [("R", 546, False), ("S", 79, True)]          # 546*4=2184 kg + 79*4=316 kg = 2500 kg
+    assert out.backorder_qty == 0
+    assert "substitute:R" in out.split[1].changes_vs_request and "origin:tn" in out.split[1].changes_vs_request
+    assert out.exceptions == ["PARTIAL_AVAILABILITY", "SUBSTITUTED"]
+
+
+def test_no_substitute_preference_keeps_partial_plus_backorder():
+    ln, products, prices, avail, req = tomato_fixture("no_substitute")
+    out = build_offer_line(ln, products, prices, avail, DELIVERY, requested=req)
+    assert [(c.product_id, c.qty_sales_units) for c in out.split] == [("R", 546)]
+    assert out.backorder_qty == Decimal("316")
+    assert {e.product_id: e.reason for e in out.excluded} == {"S": "SUBSTITUTION_NOT_ALLOWED"}
+
+
+def test_cutoff_passed_is_excluded():
+    from datetime import datetime
+    out = build_offer_line(line(), [product("A", "Milk 1 l", claims=("FREE_FROM_LACTOSE",))],
+                           {"A": price("A", "1", "1")}, {"A": stock("A", "9999999999")}, DELIVERY,
+                           now=datetime.fromisoformat("2026-11-15T18:00:00+02:00"))
+    assert out.excluded[0].reason == "CUTOFF_PASSED"

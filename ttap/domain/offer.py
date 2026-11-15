@@ -19,7 +19,7 @@ def offer_hash(offer: Offer) -> str:
 def offer_valid_until(now: datetime, ttl: timedelta, lines: list[OfferLine]) -> datetime:
     bounds = [now + ttl]
     for line in lines:
-        for cand in line.tiers.values():
+        for cand in [*line.tiers.values(), *line.split]:
             bounds += [b for b in (cand.price_valid_to, cand.order_cutoff) if b is not None]
     return min(bounds)
 
@@ -27,7 +27,16 @@ def offer_valid_until(now: datetime, ttl: timedelta, lines: list[OfferLine]) -> 
 def resolve_selection(offer: Offer, selected: list[SelectedLine]) -> list[Candidate]:
     """Raises KeyError when a line or tier does not exist in the offer."""
     lines = {line.line_id: line for line in offer.lines}
-    return [lines[s.line_id].tiers[s.tier] for s in selected]
+    out: list[Candidate] = []
+    for s in selected:
+        line = lines[s.line_id]
+        if s.tier == "split":
+            if not line.split:
+                raise KeyError(f"{s.line_id}/split")
+            out.extend(line.split)
+        else:
+            out.append(line.tiers[s.tier])
+    return out
 
 
 def price_lock_until(now: datetime, approval_timeout: timedelta, candidates: list[Candidate]) -> datetime:

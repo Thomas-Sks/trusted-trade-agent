@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from ttap.domain.explain import explain_rules
+from ttap.domain.offer import resolve_selection
 from ttap.domain.models import (
     ApprovalCard, Candidate, CardLine, Mandate, Offer, Order, OriginAssurance, StockStatus,
 )
@@ -15,8 +16,7 @@ LOW_RATIO = Decimal("0.5")
 
 
 def selected_candidates(order: Order, offer: Offer) -> list[Candidate]:
-    lines = {line.line_id: line for line in offer.lines}
-    return [lines[s.line_id].tiers[s.tier] for s in order.selected]
+    return resolve_selection(offer, order.selected)
 
 
 def _vs_usual(c: Candidate, mandate: Mandate | None) -> str | None:
@@ -43,6 +43,11 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
     for c in cands:
         if c.origin == OriginAssurance.CONFLICT:
             warnings.append(f"origine contradictoire ({'/'.join(c.origins)}) : {c.name}")
+    lines_by_id = {line.line_id: line for line in offer.lines}
+    for sel in order.selected:
+        line = lines_by_id[sel.line_id]
+        if sel.tier == "split" and line.backorder_qty > 0:
+            warnings.append(f"reliquat non couvert : {line.backorder_qty.normalize():f} (unité demandée)")
     cutoffs = [c.order_cutoff for c in cands if c.order_cutoff is not None]
     minutes = int((min(cutoffs) - now).total_seconds() // 60) if cutoffs else None
     gross = sum((c.line_total_net * (1 + c.vat_rate / 100) for c in cands), Decimal(0)).quantize(CENT)
@@ -52,7 +57,7 @@ def build_card(order: Order, offer: Offer, mandate: Mandate | None, now: datetim
         offer_hash_short=order.offer_hash.removeprefix("sha256:")[:8],
         total_net=order.total_net, total_gross=gross,
         reasons=explain_rules(decision.rules_fired, decision.context) if decision else [],
-        lines=[CardLine(name=c.name, qty_sales_units=c.qty_sales_units, sales_unit=c.sales_unit,
+        lines=[CardLine(name=c.name, partial=c.partial, is_substitute=c.is_substitute, qty_sales_units=c.qty_sales_units, sales_unit=c.sales_unit,
                         unit_net=c.unit_net, line_total_net=c.line_total_net, stock=c.stock,
                         changes=c.changes_vs_request, vs_usual=_vs_usual(c, mandate)) for c in cands],
         warnings=warnings,

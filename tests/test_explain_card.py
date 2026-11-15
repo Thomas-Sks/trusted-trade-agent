@@ -75,5 +75,5 @@ def test_telegram_html_is_short_escaped_and_french():
     order, offer, mandate = fixtures(c, [UsualItem(product_id="P1", median_qty=Decimal("100"))])
     html = render_card_html(build_card(order, offer, mandate, DEMO_NOW))
     assert "&lt;special&gt; &amp; co" in html and "<special>" not in html
-    assert "3 030,00 €" in html and "1 h 35" in html and "🔁 origine NL" in html and "lun. 16/11" in html
+    assert "3 030,00 €" in html and "1 h 35" in html and "🌍 origine NL" in html and "lun. 16/11" in html
     assert max(len(line) for line in html.splitlines() if line.startswith("📦")) < 60

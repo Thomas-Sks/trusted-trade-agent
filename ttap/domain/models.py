@@ -121,7 +121,7 @@ class UpstreamAvailability(BaseModel):
     closing_time: datetime | None = None
 
 
-Tier = Literal["good", "better", "best"]
+Tier = Literal["good", "better", "best", "split"]
 
 
 class Candidate(BaseModel):
@@ -150,6 +150,7 @@ class Candidate(BaseModel):
     is_substitute: bool = False
     partial: bool = False
     missing_qty: Decimal = Decimal("0")
+    lot_size: Decimal = Decimal("1")
 
 
 class Exclusion(BaseModel):
@@ -162,6 +163,8 @@ class OfferLine(BaseModel):
     tiers: dict[str, Candidate]
     excluded: list[Exclusion]
     exceptions: list[str]
+    split: list[Candidate] = []
+    backorder_qty: Decimal = Decimal("0")
 
 
 class Offer(BaseModel):
@@ -257,6 +260,8 @@ class AuditEvent(BaseModel):
 
 class CardLine(BaseModel):
     name: str
+    partial: bool = False
+    is_substitute: bool = False
     qty_sales_units: Decimal
     sales_unit: str
     unit_net: Decimal

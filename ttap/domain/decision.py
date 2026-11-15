@@ -18,4 +18,5 @@ def build_decision_context(candidates: list[Candidate], mandate: Mandate | None,
         "max_unverified_value_net": mandate.max_unverified_value_net if mandate else ZERO,
         "has_origin_conflict": any(c.origin == OriginAssurance.CONFLICT for c in candidates),
         "has_changes_vs_request": any(c.changes_vs_request for c in candidates),
+        "has_partial": any(c.partial for c in candidates),
     }

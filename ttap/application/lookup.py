@@ -22,25 +22,30 @@ class LookupService:
         self._ttl, self._limit = offer_ttl, search_limit
         self._auditor = auditor
 
-    def _candidates(self, line: RequestLine) -> list[CatalogProduct]:
+    def _candidates(self, line: RequestLine) -> tuple[list[CatalogProduct], CatalogProduct | None]:
+        """Explicit product -> itself + its official substitutes; otherwise a catalogue search."""
         if line.need.product_id:
-            p = self._catalog.get(line.need.product_id)
-            return [p] if p else []
-        return self._catalog.search(line.need.text, limit=self._limit)
+            requested = self._catalog.get(line.need.product_id)
+            if requested is None:
+                return [], None
+            subs = [self._catalog.get(s) for s in requested.substitutes]
+            return [requested, *[p for p in subs if p is not None]], requested
+        return self._catalog.search(line.need.text, limit=self._limit), None
 
     async def lookup(self, org_id: str, request_id: str) -> Offer:
         req = self._store.get_request(org_id, request_id)
         if req is None:
             raise NotFound(f"request {request_id}")
         per_line = {line.line_id: self._candidates(line) for line in req.lines}
-        ids = [p.product_id for products in per_line.values() for p in products]
+        ids = [p.product_id for products, _ in per_line.values() for p in products]
         try:
             prices = await self._gateway.prices(ids, req.delivery.requested_date) if ids else {}
             avail = await self._gateway.availability(ids, req.delivery.requested_date) if ids else {}
         except UpstreamUnavailable as exc:
             raise UpstreamError(str(exc)) from exc
-        lines = [build_offer_line(line, per_line[line.line_id], prices, avail, req.delivery) for line in req.lines]
         now = self._clock.now()
+        lines = [build_offer_line(line, per_line[line.line_id][0], prices, avail, req.delivery, now=now,
+                                  requested=per_line[line.line_id][1]) for line in req.lines]
         offer = Offer(offer_id=self._new_id("of"), request_id=req.request_id, org_id=org_id, issued_at=now,
                       valid_until=offer_valid_until(now, self._ttl, lines),
                       catalog_version=self._catalog.version, lines=lines)
@@ -52,6 +57,8 @@ class LookupService:
             data={"offer_id": offer.offer_id, "offer_hash": offer_hash(offer),
                   "valid_until": offer.valid_until.isoformat(), "catalog_version": offer.catalog_version,
                   "lines": [{"line_id": ln.line_id, "tiers": {t: c.product_id for t, c in ln.tiers.items()},
+                             "split": [[c.product_id, str(c.qty_sales_units)] for c in ln.split],
+                             "backorder_qty": str(ln.backorder_qty),
                              "excluded": [e.model_dump() for e in ln.excluded], "exceptions": ln.exceptions}
                             for ln in lines]})
         return offer

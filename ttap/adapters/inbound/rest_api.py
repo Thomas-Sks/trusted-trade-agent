@@ -15,6 +15,7 @@ from ttap.adapters.outbound.jws_signer import EcdsaSigner
 from ttap.application.approvals import ApprovalService
 from ttap.application.auditing import Auditor
 from ttap.application.errors import TTAPError
+from ttap.application.interpret import InterpretService
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
@@ -46,6 +47,12 @@ class Services:
     approvals: ApprovalService
     auditor: Auditor
     demo: DemoControls | None = None
+    interpret: InterpretService | None = None
+
+
+class InterpretBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str
 
 
 class ClockAdvance(BaseModel):
@@ -166,6 +173,13 @@ def create_app(services: Services, agent_keys: dict[str, str],
     @app.post("/admin/clock/advance")
     def advance_clock(body: ClockAdvance, _: str = Depends(admin)) -> dict:
         return {"now": services.demo.clock.advance(body.minutes).isoformat()}
+
+    @app.post("/interpret")
+    async def interpret(body: InterpretBody, org: str = Depends(org_id)) -> dict:
+        from ttap.application.interpret import InterpreterUnavailable
+        if services.interpret is None:
+            raise InterpreterUnavailable("interpretation not configured")
+        return await services.interpret.interpret(org, body.text)
 
     @app.post("/requests", status_code=201, response_model=PurchaseRequest)
     def create_request(body: CreateRequestBody, org: str = Depends(org_id)) -> PurchaseRequest:

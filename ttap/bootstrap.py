@@ -22,6 +22,7 @@ from ttap.adapters.outbound.scenario_gateway import ScenarioGateway
 from ttap.adapters.outbound.sqlite_store import SqliteStore
 from ttap.adapters.outbound.valio_gateway import ValioGateway
 from ttap.application.approvals import ApprovalService
+from ttap.application.interpret import InterpretService
 from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
@@ -61,7 +62,7 @@ def demo_mandates() -> InMemoryMandates:
 def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: Clock,
                    store: Store | None = None, signer: Signer | None = None,
                    mandates: MandateRepository | None = None, audit: AuditLog | None = None,
-                   notifier: Notifier | None = None, simulated=lambda: []) -> Services:
+                   notifier: Notifier | None = None, simulated=lambda: [], interpreter=None) -> Services:
     store = store or SqliteStore()
     signer = signer or EcdsaSigner()
     mandates = mandates or demo_mandates()
@@ -74,6 +75,7 @@ def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: 
         signer=signer,
         approvals=ApprovalService(store, policy, mandates, clock, auditor, notifier or LoggingNotifier()),
         auditor=auditor,
+        interpret=InterpretService(interpreter, catalog, mandates, clock, auditor),
     )
 
 
@@ -85,6 +87,13 @@ def parse_approver_entries(raw: str) -> dict[str, tuple[str, str]]:
             secret, org, user = item.strip().split(":", 2)
             out[secret] = (org, user)
     return out
+
+
+def _interpreter():
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return None
+    from ttap.adapters.outbound.claude_interpreter import ClaudeInterpreter
+    return ClaudeInterpreter()
 
 
 @dataclass
@@ -114,7 +123,8 @@ def build_live() -> LiveApp:
         telegram = TelegramNotifier(os.environ["TELEGRAM_BOT_TOKEN"], store)
     services = build_services(catalog, gateway, clock, store=store, signer=signer,
                               audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer),
-                              notifier=telegram, simulated=lambda: scenario.scenario.active())
+                              notifier=telegram, simulated=lambda: scenario.scenario.active(),
+                              interpreter=_interpreter())
     services.demo = DemoControls(scenario=scenario, cache=gateway, clock=clock)
     if telegram:
         from ttap.adapters.inbound.telegram_logic import ApprovalBotLogic

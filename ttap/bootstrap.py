@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -14,15 +15,17 @@ from ttap.adapters.outbound.cedar_engine import CedarPolicyEngine
 from ttap.adapters.outbound.clocks import ShiftedClock
 from ttap.adapters.outbound.jsonl_audit import JsonlAuditLog, MemoryAuditLog
 from ttap.adapters.outbound.jws_signer import EcdsaSigner
+from ttap.adapters.outbound.logging_notifier import LoggingNotifier
 from ttap.adapters.outbound.memory_mandates import InMemoryMandates
 from ttap.adapters.outbound.sqlite_store import SqliteStore
 from ttap.adapters.outbound.valio_gateway import ValioGateway
+from ttap.application.approvals import ApprovalService
 from ttap.application.auditing import AuditLog, Auditor
 from ttap.application.lookup import LookupService
 from ttap.application.orders import OrderService
 from ttap.application.requests import RequestService
 from ttap.domain.models import Mandate
-from ttap.ports import CatalogRepository, Clock, MandateRepository, Signer, Store, SupplierGateway
+from ttap.ports import CatalogRepository, Clock, MandateRepository, Notifier, Signer, Store, SupplierGateway
 
 ROOT = Path(__file__).resolve().parent.parent
 POLICIES = ROOT / "policies" / "base.cedar"
@@ -50,28 +53,62 @@ def demo_mandates() -> InMemoryMandates:
 
 def build_services(catalog: CatalogRepository, gateway: SupplierGateway, clock: Clock,
                    store: Store | None = None, signer: Signer | None = None,
-                   mandates: MandateRepository | None = None, audit: AuditLog | None = None) -> Services:
+                   mandates: MandateRepository | None = None, audit: AuditLog | None = None,
+                   notifier: Notifier | None = None) -> Services:
     store = store or SqliteStore()
     signer = signer or EcdsaSigner()
     mandates = mandates or demo_mandates()
     auditor = Auditor(audit or MemoryAuditLog(signer), clock, new_id)
+    policy = CedarPolicyEngine.from_file(POLICIES)
     return Services(
         requests=RequestService(store, new_id, auditor),
         lookup=LookupService(catalog, gateway, signer, clock, store, new_id, auditor),
-        orders=OrderService(store, signer, CedarPolicyEngine.from_file(POLICIES), mandates, clock, new_id, auditor),
+        orders=OrderService(store, signer, policy, mandates, clock, new_id, auditor),
         signer=signer,
+        approvals=ApprovalService(store, policy, mandates, clock, auditor, notifier or LoggingNotifier()),
+        auditor=auditor,
     )
 
 
-def build_live() -> tuple[Services, dict[str, str]]:
+def parse_approver_entries(raw: str) -> dict[str, tuple[str, str]]:
+    """'secret:org:user,...' -> {secret: (org, user)} (used for approver API keys and Telegram pairing codes)."""
+    out = {}
+    for item in raw.split(","):
+        if item.strip():
+            secret, org, user = item.strip().split(":", 2)
+            out[secret] = (org, user)
+    return out
+
+
+@dataclass
+class LiveApp:
+    services: Services
+    agent_keys: dict[str, str]
+    approver_keys: dict[str, tuple[str, str]]
+    lifecycle: object | None
+
+
+def build_live() -> LiveApp:
     catalog = JsonCatalog.from_file(ROOT / os.environ.get(
         "CATALOG_PATH", "resources/valio_aimo_junction26_product_data.json"))
     client = httpx.AsyncClient(base_url=os.environ.get("VALIO_BASE_URL", "https://junction26.valioaimo.fi"),
                                timeout=30.0)
     gateway = ValioGateway(client, os.environ["VALIO_API_KEY"])
     signer = EcdsaSigner.load_or_create(os.environ.get("TTAP_SIGNING_KEY", str(ROOT / "ttap_signing_key.json")))
-    services = build_services(catalog, gateway, ShiftedClock(DEMO_START),
-                              store=SqliteStore(os.environ.get("TTAP_DB", "ttap.db")), signer=signer,
-                              audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer))
+    store = SqliteStore(os.environ.get("TTAP_DB", "ttap.db"))
+    clock = ShiftedClock(DEMO_START)
+    telegram = None
+    if os.environ.get("TELEGRAM_BOT_TOKEN"):
+        from ttap.adapters.outbound.telegram_notifier import TelegramNotifier
+        telegram = TelegramNotifier(os.environ["TELEGRAM_BOT_TOKEN"], store)
+    services = build_services(catalog, gateway, clock, store=store, signer=signer,
+                              audit=JsonlAuditLog(os.environ.get("TTAP_AUDIT", "audit.jsonl"), signer),
+                              notifier=telegram)
+    if telegram:
+        from ttap.adapters.inbound.telegram_logic import ApprovalBotLogic
+        pairing = parse_approver_entries(os.environ.get("APPROVER_PAIRING", "PAIR-HOTEL-A:org_hotel_a:chef_alice"))
+        telegram.bind(ApprovalBotLogic(store, services.approvals, pairing, clock,
+                                       web_base_url=os.environ.get("TTAP_PUBLIC_URL")))
     keys = parse_agent_keys(os.environ.get("AGENT_KEYS", "demo-key-hotel-a:org_hotel_a,demo-key-resto-b:org_resto_b"))
-    return services, keys
+    approvers = parse_approver_entries(os.environ.get("APPROVER_KEYS", "approver-key-hotel-a:org_hotel_a:chef_alice"))
+    return LiveApp(services, keys, approvers, telegram)

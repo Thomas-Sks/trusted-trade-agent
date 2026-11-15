@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
 from ttap.adapters.inbound.rest_api import Services, create_app
+from ttap.adapters.outbound.logging_notifier import LoggingNotifier
+from ttap.application.approvals import ApprovalService
 from tests.env import Env
 
 A = {"Authorization": "Bearer key-a"}
@@ -10,10 +12,22 @@ BODY = {"lines": [{"line_id": "L1", "need": {"text": "lactose free milk", "requi
         "delivery": {"requested_date": "2026-11-16", "latest_acceptable_date": "2026-11-16"}}
 
 
-def client() -> TestClient:
-    env = Env()
-    services = Services(requests=env.requests, lookup=env.lookup, orders=env.orders, signer=env.signer)
-    return TestClient(create_app(services, {"key-a": "org_a", "key-b": "org_b"}))
+APPROVER = {"Authorization": "Bearer appr-a"}
+
+
+def client(limit: str = "2000") -> TestClient:
+    env = Env(limit=limit)
+    approvals = ApprovalService(env.store, env.policy, env.mandates, env.clock, env.auditor, LoggingNotifier())
+    services = Services(requests=env.requests, lookup=env.lookup, orders=env.orders, signer=env.signer,
+                        approvals=approvals, auditor=env.auditor)
+    return TestClient(create_app(services, {"key-a": "org_a", "key-b": "org_b"}, {"appr-a": ("org_a", "alice")}))
+
+
+def place(c: TestClient, key: str = "k1") -> dict:
+    rq = c.post("/requests", json=BODY, headers=A).json()
+    offer = c.post(f"/requests/{rq['request_id']}/lookup", headers=A).json()
+    return c.post("/orders", json={"offer_id": offer["offer_id"], "selected": [{"line_id": "L1", "tier": "good"}]},
+                  headers=A | {"Idempotency-Key": key}).json()
 
 
 def test_full_flow_request_lookup_order():
@@ -48,3 +62,22 @@ def test_well_known_publishes_public_key():
     doc = client().get("/.well-known/ttap.json").json()
     assert doc["steps"] == ["request", "lookup", "order", "approval"]
     assert "d" not in doc["jwks"]["keys"][0]
+
+
+def test_escalation_then_human_approval_and_verified_audit():
+    c = client(limit="500")
+    order = place(c)
+    assert order["state"] == "PENDING_HUMAN"
+    assert [o["order_id"] for o in c.get("/approvals", headers=APPROVER).json()] == [order["order_id"]]
+    card = c.get(f"/orders/{order['order_id']}/card", headers=APPROVER).json()
+    assert card["reasons"] == ["Total 1010.00 € HT > plafond par commande 500 €"]
+    assert c.post(f"/orders/{order['order_id']}/approve", json={}, headers=A).status_code == 401
+    done = c.post(f"/orders/{order['order_id']}/approve", json={"expected_version": order["version"]},
+                  headers=APPROVER)
+    assert done.json()["state"] == "APPROVED"
+    again = c.post(f"/orders/{order['order_id']}/approve", json={}, headers=APPROVER)
+    assert again.status_code == 409
+    report = c.get("/audit/verify", headers=A).json()
+    assert report["valid"] is True and report["events"] == 6
+    types = [e["type"] for e in c.get("/audit", headers=APPROVER).json()]
+    assert types[-2:] == ["org.ttap.approval.escalated.v1", "org.ttap.approval.approved.v1"]

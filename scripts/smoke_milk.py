@@ -10,7 +10,7 @@ MONDAY = date(2026, 11, 16)
 
 
 async def run(litres: str, key: str) -> None:
-    services, _ = build_live()
+    services = build_live().services
     req = services.requests.create("org_hotel_a", [RequestLine(
         line_id="L1", need=Need(text="lactose free milk", required_claims=["FREE_FROM_LACTOSE"]),
         quantity=Quantity(value=Decimal(litres), unit=Unit.L))],

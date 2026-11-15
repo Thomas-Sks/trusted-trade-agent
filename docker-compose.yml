@@ -1,0 +1,24 @@
+services:
+  gateway:
+    build: .
+    env_file: .env
+    environment:
+      CATALOG_PATH: resources/valio_aimo_junction26_product_data.json
+    volumes:
+      - ./resources:/app/resources:ro
+      - ttap-data:/data
+    ports: ["8811:8811"]
+  web:
+    build: ./web
+    environment:
+      GATEWAY_URL: http://gateway:8811
+      KEY_AGENT_HOTEL: demo-key-hotel-a
+      KEY_AGENT_RESTO: demo-key-resto-b
+      KEY_APPROVER_HOTEL: approver-key-hotel-a
+      KEY_APPROVER_RESTO: approver-key-resto-b
+      KEY_ADMIN: admin-key-valio
+      NEXT_PUBLIC_TELEGRAM_BOT: ${TELEGRAM_BOT_USERNAME:-}
+    depends_on: [gateway]
+    ports: ["3100:3100"]
+volumes:
+  ttap-data:

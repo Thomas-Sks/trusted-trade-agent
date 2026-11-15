@@ -73,6 +73,9 @@ class TTAPClient:
         return await self._call("POST", "/orders", json={"offer_id": offer_id, "selected": selected},
                                 headers={"Idempotency-Key": key})
 
+    async def preview_order(self, offer_id: str, selected: list[dict]) -> dict:
+        return await self._call("POST", "/orders/preview", json={"offer_id": offer_id, "selected": selected})
+
     async def get_order(self, order_id: str) -> dict:
         return await self._call("GET", f"/orders/{order_id}")
 

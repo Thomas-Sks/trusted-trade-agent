@@ -1,0 +1,11 @@
+.venv
+web
+.env
+*.db*
+audit.jsonl
+ttap_signing_key.json
+resources
+docs
+eval
+conformance
+tests

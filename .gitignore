@@ -9,3 +9,4 @@ resources/*.csv
 ttap_signing_key.json
 audit.jsonl
 conformance/compatibility.json
+resources/NOTES.md

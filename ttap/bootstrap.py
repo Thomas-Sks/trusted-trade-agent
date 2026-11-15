@@ -57,7 +57,7 @@ def demo_mandates() -> InMemoryMandates:
                                            UsualItem(product_id="462545", median_qty=Decimal("500"))]),
         "org_resto_b": Mandate(org_id="org_resto_b", version=1, valid_until=until,
                                limit_per_order_net=Decimal("800"), max_unverified_value_net=Decimal("200"),
-                               period_budget_net=Decimal("3000"), max_orders_per_hour=3),
+                               period_budget_net=Decimal("20000"), max_orders_per_hour=12),
     })
 
 

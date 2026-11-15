@@ -9,7 +9,7 @@ const LIMITS = [
   { key: "limit_per_order_net", label: "Per-order limit", unit: "€", value: "2000", hint: "Above this amount, a human must approve." },
   { key: "period_budget_net", label: "Weekly budget", unit: "€", value: "10000", hint: "Total the agent may commit per 7 days." },
   { key: "max_unverified_value_net", label: "Unverified stock allowance", unit: "€", value: "500", hint: "Supplier-held stock Valio cannot verify." },
-  { key: "max_orders_per_hour", label: "Max orders per hour", unit: "", value: "5", hint: "Catches an agent splitting orders under the limit." },
+  { key: "max_orders_per_hour", label: "Max orders per hour", unit: "", value: "10", hint: "Catches an agent splitting orders under the limit." },
 ] as const;
 
 interface Created { org_id: string; name: string; approver_name: string; agent_key: string; approver_key: string; pairing_code: string; telegram_link: string | null }

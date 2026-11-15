@@ -4,6 +4,7 @@ import { AgentLive, type Launch } from "@/components/AgentLive";
 import { Approvals } from "@/components/Approvals";
 import { AuditLog } from "@/components/AuditLog";
 import { DemoMenu } from "@/components/DemoMenu";
+import { Kitchen } from "@/components/Kitchen";
 import { Mandate } from "@/components/Mandate";
 import { NewRequest } from "@/components/NewRequest";
 import { Onboarding } from "@/components/Onboarding";
@@ -12,6 +13,7 @@ import { DEMO_ORGS, loadMyOrgs, saveMyOrgs, type OrgProfile } from "@/lib/api";
 
 const TABS = [
   { key: "start", label: "Get started" },
+  { key: "kitchen", label: "Kitchen" },
   { key: "live", label: "Agent live" },
   { key: "new", label: "New request" },
   { key: "requests", label: "Orders" },
@@ -83,6 +85,7 @@ export default function Home() {
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className={tab === "start" ? "" : "hidden"}><Onboarding onCreated={addOrg} onReady={onReady} /></div>
+        {tab === "kitchen" && <Kitchen key={org.id} org={org} />}
         <div className={tab === "live" ? "" : "hidden"}><AgentLive key={org.id} org={org} launch={launch} /></div>
         <div className={tab === "new" ? "" : "hidden"}><NewRequest key={org.id} org={org} /></div>
         {tab === "requests" && <Requests key={org.id} org={org} />}

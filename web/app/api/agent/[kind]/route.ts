@@ -6,8 +6,11 @@ const AGENT = process.env.AGENT_URL ?? "http://localhost:8820";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ kind: string }> }): Promise<Response> {
   const { kind } = await ctx.params;
-  if (!["claude", "bot"].includes(kind)) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
+  if (!["claude", "bot", "kitchen"].includes(kind)) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
   const body = await req.text();
+  if (kind === "kitchen" && (() => { try { return JSON.parse(body).mode === "claude"; } catch { return false; } })()) {
+    const limited = limitLlm(req, "agent"); if (limited) return limited;
+  }
   if (kind === "claude") {
     const text = (() => { try { return String(JSON.parse(body).text ?? ""); } catch { return ""; } })();
     if (text.length > 400) return Response.json({ code: "TOO_LONG", detail: "Please keep the purchasing request under 400 characters." }, { status: 413 });

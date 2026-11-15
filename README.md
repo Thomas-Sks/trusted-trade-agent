@@ -58,6 +58,7 @@ length-capped, and the agent only handles purchasing requests.
 
 | Try | Command |
 |---|---|
+| **Kitchen (start here)** | Console → *Kitchen*: a restaurant inventory; *Dinner service* empties it, the agent restocks with one order per category; most orders pass without a human, the unverifiable one waits for approval |
 | **Onboard yourself** | Console → *Get started*: create an organisation, set its mandate, pair your phone via QR, run the agent |
 | **Watch an agent act** | Console → *Agent live*: Claude's tool calls, results, and every gateway request on the protocol wire (`MCP · lookup`, `REST · replenishment-bot`) |
 | Claude agent over MCP | `uv run --env-file .env python -m buyer_agent.reference_agent "1000 L of lactose-free milk for Monday"` |

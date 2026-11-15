@@ -5,7 +5,7 @@ import {api, euro, num, type OrgProfile } from "@/lib/api";
 import { FlowTracker, type FlowStep } from "./FlowTracker";
 import { Badge, Button, Card, RULE_LABEL, StatusBadge } from "./ui";
 
-type Ev = { type: string; code?: string; text?: string; tool?: string; input?: Record<string, unknown>; result?: unknown; model?: string; tools?: string[] };
+export type Ev = { type: string; code?: string; text?: string; tool?: string; input?: Record<string, unknown>; result?: unknown; model?: string; tools?: string[] };
 type Wire = { id: number; time: number; method: string; path: string; status: number; ms: number; via: string };
 
 const DEFAULT = "We need 1,000 litres of lactose-free milk for Monday, Finnish if possible.";
@@ -17,27 +17,53 @@ const QUICK = [
 const STEP_OF: Record<string, string> = { interpret_request: "request", create_request: "request", lookup: "lookup", place_order: "order" };
 
 /* ---------- human-readable tool inputs & results ---------- */
-function describeCall(tool: string, input: Record<string, unknown> = {}) {
+export function describeCall(tool: string, input: Record<string, unknown> = {}) {
   if (tool === "interpret_request" || tool === "create_request") {
     if (tool === "interpret_request") return `“${String(input.text ?? "")}”`;
     const lines = (input.lines as { need?: { text?: string; product_id?: string; required_claims?: string[] }; quantity?: { value?: string; unit?: string } }[]) ?? [];
     return lines.map((l) => `${num(l.quantity?.value ?? 0)} ${l.quantity?.unit ?? ""} ${l.need?.product_id ? `product ${l.need.product_id}` : l.need?.text ?? ""}${l.need?.required_claims?.length ? ` · must be ${l.need.required_claims.join(", ").toLowerCase().replaceAll("_", " ")}` : ""}`).join(" + ") + ` · delivery ${String(input.requested_date ?? "")}`;
   }
+  if (tool === "check_inventory") return "the restaurant's own stock levels";
   if (tool === "lookup") return `request ${String(input.request_id)}`;
-  if (tool === "place_order") return `offer ${String(input.offer_id)} · ${Object.entries((input.line_choices as Record<string, string>) ?? {}).map(([l, t]) => `${l} → ${t}`).join(", ")}`;
+  if (tool === "place_order") {
+    const picks = (input.line_choices as Record<string, string>) ??
+      Object.fromEntries(((input.selected as { line_id: string; tier: string }[]) ?? []).map((s) => [s.line_id, s.tier]));
+    return `offer ${String(input.offer_id)} · ${Object.entries(picks).map(([l, t]) => `${l} → ${t}`).join(", ")}`;
+  }
   return String(input.order_id ?? JSON.stringify(input));
 }
 
-function ResultView({ tool, result }: { tool: string; result: unknown }) {
+export function ResultView({ tool, result }: { tool: string; result: unknown }) {
   const r = result as Record<string, unknown>;
   if (r && typeof r === "object" && "error" in r) return <Badge tone="bad">{String(r.error)}: {String(r.detail ?? "")}</Badge>;
   if (tool === "interpret_request") {
     const a = (r.assumptions as string[]) ?? [];
     return <div className="text-xs text-muted">Structured request · {a.length} assumption{a.length !== 1 ? "s" : ""}{a[0] ? ` — e.g. “${a[0]}”` : ""}</div>;
   }
+  if (tool === "check_inventory") {
+    const low = (r.low as { item: string; on_hand: number; reorder_point: number; order_quantity: number; unit: string }[]) ?? [];
+    return (
+      <div className="space-y-1 text-xs">
+        <div className="text-muted">{low.length} item{low.length !== 1 ? "s" : ""} below reorder point · {((r.ok as string[]) ?? []).length} OK</div>
+        {low.map((l) => <div key={l.item}><b>{l.item}</b>: {num(l.on_hand)} {l.unit} &lt; {num(l.reorder_point)} → order {num(l.order_quantity)} {l.unit}</div>)}
+      </div>
+    );
+  }
   if (tool === "create_request") return <div className="text-xs text-muted">Request <span className="font-mono">{String(r.request_id)}</span> registered</div>;
   if (tool === "lookup") {
-    const line = ((r.lines as Record<string, unknown>[]) ?? [])[0] ?? {};
+    const allLines = (r.lines as Record<string, unknown>[]) ?? [];
+    if (allLines.length > 1) {
+      const pick = (ln: Record<string, unknown>) => { const t = (ln.tiers as Record<string, Record<string, string>>) ?? {}; return t.better ?? t.good; };
+      return (
+        <div className="space-y-1.5">
+          <Badge tone={r.signature_verified ? "ok" : "bad"}>{r.signature_verified ? "Signature verified by the buyer" : "Signature NOT verified"}</Badge>
+          {allLines.map((ln) => { const c = pick(ln); return c ? (
+            <div key={String(ln.line_id)} className="text-xs"><span className="font-medium">{c.name}</span> · {num(c.qty_sales_units)} × {euro(c.unit_net)} = <b>{euro(c.line_total_net)}</b>
+              {c.stock === "UNKNOWN_SUPPLIER_STOCK" && <span className="ml-1"><Badge tone="warn">stock not verified</Badge></span>}</div>) : null; })}
+        </div>
+      );
+    }
+    const line = allLines[0] ?? {};
     const tiers = (line.tiers as Record<string, Record<string, string>>) ?? {};
     const best = tiers.better ?? tiers.good;
     return (

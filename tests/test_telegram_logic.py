@@ -79,3 +79,13 @@ async def test_step_up_replaces_approve_callback_with_web_link():
 
 def approvals_card(logic, order):
     return logic.approvals.card(order.org_id, order.order_id)
+
+
+async def test_one_telegram_account_approves_for_every_org_it_paired():
+    env, logic, order = await setup()
+    logic.link(111, "PAIR-B")   # paired to another organisation first
+    logic.link(111, "PAIR-A")   # pairing a second one keeps the first
+    assert env.store.approver_chats("org_b") == [111] and env.store.approver_chats("org_a") == [111]
+    approve = data_for(logic.buttons(order, approvals_card(logic, order)), "✅")
+    assert (await logic.handle(111, approve)).kind == "approved"
+    assert env.store.get_order("org_a", order.order_id).approved_by == "alice"

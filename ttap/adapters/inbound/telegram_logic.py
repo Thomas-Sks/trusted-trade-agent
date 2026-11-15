@@ -64,13 +64,13 @@ class ApprovalBotLogic:
                 ("🔎 Details", self._token(order, "detail"), None)]
 
     async def handle(self, telegram_id: int, data: str) -> BotReply:
-        approver = self._store.approver_by_telegram(telegram_id)
-        if approver is None:
+        if self._store.approver_by_telegram(telegram_id) is None:
             return BotReply("error", "🔒 Account not paired: open the pairing link or send /start &lt;code&gt;.")
         token = self._store.get_action_token(data.removeprefix(PREFIX))
         if token is None or token.used or self._clock.now() >= token.expires_at:
             return BotReply("error", "⌛ Action expired or already used.")
-        if token.org_id != approver.org_id:
+        approver = self._store.approver_by_telegram(telegram_id, token.org_id)  # this account, for this order's org
+        if approver is None:
             return BotReply("error", "🚫 Not authorised for this organisation.")
         try:
             if token.action == "detail":

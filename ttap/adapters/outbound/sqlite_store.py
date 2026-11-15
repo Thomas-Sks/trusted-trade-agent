@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS reservations (order_id TEXT NOT NULL, org_id TEXT NOT
 CREATE TABLE IF NOT EXISTS organisations (org_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS approver_links (telegram_id INTEGER PRIMARY KEY, org_id TEXT NOT NULL,
   user_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS approver_links_v2 (telegram_id INTEGER NOT NULL, org_id TEXT NOT NULL,
+  user_id TEXT NOT NULL, PRIMARY KEY (telegram_id, org_id));
 CREATE TABLE IF NOT EXISTS action_tokens (id TEXT PRIMARY KEY, org_id TEXT NOT NULL, order_id TEXT NOT NULL,
   version INTEGER NOT NULL, action TEXT NOT NULL, expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0);
 """
@@ -35,6 +37,10 @@ class SqliteStore:
         if path != ":memory:":
             self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        # one Telegram account may approve for several organisations: carry over single-org links once
+        if not self._db.execute("SELECT 1 FROM approver_links_v2 LIMIT 1").fetchone():
+            self._db.execute("INSERT OR IGNORE INTO approver_links_v2 SELECT telegram_id, org_id, user_id "
+                             "FROM approver_links")
 
     def _one(self, sql: str, params: tuple) -> tuple | None:
         with self._lock:
@@ -104,16 +110,25 @@ class SqliteStore:
              expected_state.value, expected_version)) == 1
 
     def link_approver(self, telegram_id: int, org_id: str, user_id: str) -> None:
-        self._write("INSERT OR REPLACE INTO approver_links (telegram_id, org_id, user_id) VALUES (?, ?, ?)",
-                    (telegram_id, org_id, user_id))
+        """Adds an organisation to this Telegram account (earlier pairings are kept)."""
+        with self._lock:
+            self._db.execute("DELETE FROM approver_links_v2 WHERE telegram_id = ? AND org_id = ?", (telegram_id, org_id))
+            self._db.execute("INSERT INTO approver_links_v2 (telegram_id, org_id, user_id) VALUES (?, ?, ?)",
+                             (telegram_id, org_id, user_id))
 
-    def approver_by_telegram(self, telegram_id: int) -> ApproverRef | None:
-        row = self._one("SELECT org_id, user_id FROM approver_links WHERE telegram_id = ?", (telegram_id,))
+    def approver_by_telegram(self, telegram_id: int, org_id: str | None = None) -> ApproverRef | None:
+        """The account's approver identity for `org_id`, or its most recent pairing when no org is given."""
+        if org_id is not None:
+            row = self._one("SELECT org_id, user_id FROM approver_links_v2 WHERE telegram_id = ? AND org_id = ?",
+                            (telegram_id, org_id))
+        else:
+            row = self._one("SELECT org_id, user_id FROM approver_links_v2 WHERE telegram_id = ? "
+                            "ORDER BY rowid DESC LIMIT 1", (telegram_id,))
         return ApproverRef(org_id=row[0], user_id=row[1]) if row else None
 
     def approver_chats(self, org_id: str) -> list[int]:
         with self._lock:
-            rows = self._db.execute("SELECT telegram_id FROM approver_links WHERE org_id = ?", (org_id,)).fetchall()
+            rows = self._db.execute("SELECT telegram_id FROM approver_links_v2 WHERE org_id = ?", (org_id,)).fetchall()
         return [r[0] for r in rows]
 
     def save_action_token(self, token: ActionToken) -> None:

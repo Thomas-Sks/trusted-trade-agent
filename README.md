@@ -82,7 +82,7 @@ length-capped, and the agent only handles purchasing requests.
 ```
 ttap/            gateway: domain (pure), application (use cases), adapters (REST, Telegram, Valio, Cedar, SQLite, JWS, Claude)
 buyer_agent/     buyer side: verifying client, MCP server, Claude reference agent, replenishment bot
-web/             Next.js console (Agent live · New request · Orders · Approvals · Mandate · Audit log)
+web/             Next.js console (Kitchen · Get started · Agent live · Orders · Approvals · Audit log)
 policies/        Cedar mandate policies
 conformance/     protocol conformance kit
 eval/            precision evaluation

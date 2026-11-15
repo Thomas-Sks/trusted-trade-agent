@@ -5,33 +5,29 @@ import { Approvals } from "@/components/Approvals";
 import { AuditLog } from "@/components/AuditLog";
 import { DemoMenu } from "@/components/DemoMenu";
 import { Kitchen } from "@/components/Kitchen";
-import { Mandate } from "@/components/Mandate";
-import { NewRequest } from "@/components/NewRequest";
 import { Onboarding } from "@/components/Onboarding";
 import { Requests } from "@/components/Requests";
 import { DEMO_ORGS, loadMyOrgs, saveMyOrgs, type OrgProfile } from "@/lib/api";
 
 const TABS = [
-  { key: "start", label: "Get started" },
   { key: "kitchen", label: "Kitchen" },
+  { key: "start", label: "Get started" },
   { key: "live", label: "Agent live" },
-  { key: "new", label: "New request" },
   { key: "requests", label: "Orders" },
   { key: "approvals", label: "Approvals" },
-  { key: "mandate", label: "Mandate" },
   { key: "audit", label: "Audit log" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
 export default function Home() {
   const [mine, setMine] = useState<OrgProfile[]>([]);
-  const [orgId, setOrgId] = useState("hotel");
-  const [tab, setTab] = useState<Tab>("start");
+  const [orgId, setOrgId] = useState("resto");
+  const [tab, setTab] = useState<Tab>("kitchen");
   const orgs = useMemo(() => [...mine, ...DEMO_ORGS], [mine]);
   const org = orgs.find((o) => o.id === orgId) ?? DEMO_ORGS[0];
   useEffect(() => {
     const saved = loadMyOrgs();
-    if (saved.length) { setMine(saved); setOrgId(saved[0].id); setTab("live"); }  // eslint-disable-line react-hooks/set-state-in-effect
+    if (saved.length) { setMine(saved); setOrgId(saved[0].id); }  // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
   const [launch, setLaunch] = useState<Launch | null>(null);
   const onReady = useCallback((limit: number, paired: boolean) => {
@@ -87,10 +83,8 @@ export default function Home() {
         <div className={tab === "start" ? "" : "hidden"}><Onboarding onCreated={addOrg} onReady={onReady} /></div>
         {tab === "kitchen" && <Kitchen key={org.id} org={org} />}
         <div className={tab === "live" ? "" : "hidden"}><AgentLive key={org.id} org={org} launch={launch} /></div>
-        <div className={tab === "new" ? "" : "hidden"}><NewRequest key={org.id} org={org} /></div>
         {tab === "requests" && <Requests key={org.id} org={org} />}
         <div className={tab === "approvals" ? "" : "hidden"}><Approvals key={org.id} org={org} onCount={onCount} /></div>
-        {tab === "mandate" && <Mandate key={org.id} org={org} />}
         {tab === "audit" && <AuditLog key={org.id} org={org} />}
       </main>
     </div>

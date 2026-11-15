@@ -90,3 +90,14 @@ def test_list_orders_is_scoped_to_the_organisation():
     order = place(c)
     assert [o["order_id"] for o in c.get("/orders", headers=A).json()] == [order["order_id"]]
     assert c.get("/orders", headers=B).json() == []
+
+
+def test_preview_decides_without_committing_anything():
+    c = client(limit="500")
+    rq = c.post("/requests", json=BODY, headers=A).json()
+    offer = c.post(f"/requests/{rq['request_id']}/lookup", headers=A).json()
+    body = {"offer_id": offer["offer_id"], "selected": [{"line_id": "L1", "tier": "good"}]}
+    preview = c.post("/orders/preview", json=body, headers=A).json()
+    assert preview == {"outcome": "PENDING_HUMAN", "rules_fired": ["total_over_order_limit"], "total_net": "1010.00"}
+    assert c.get("/orders", headers=A).json() == []                       # nothing ordered
+    assert c.post("/orders", json=body, headers=A | {"Idempotency-Key": "x"}).status_code == 202  # offer still usable

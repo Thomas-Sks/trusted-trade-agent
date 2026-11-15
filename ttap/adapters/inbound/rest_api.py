@@ -217,6 +217,11 @@ def create_app(services: Services, agent_keys: dict[str, str],
                 log.exception("escalation delivery failed for %s", order.order_id)
         return order
 
+    @app.post("/orders/preview")
+    def preview_order(body: PlaceOrderBody, org: str = Depends(org_id)) -> dict:
+        """Dry run: the decision the mandate would take for this selection. Nothing is committed."""
+        return services.orders.preview(org, body.offer_id, body.selected)
+
     @app.get("/orders", response_model=list[Order])
     def list_orders(org: str = Depends(any_org)) -> list[Order]:
         return services.orders.list(org)

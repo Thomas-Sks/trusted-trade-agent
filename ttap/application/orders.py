@@ -53,6 +53,24 @@ class OrderService:
     def list(self, org_id: str) -> list[Order]:
         return self._store.list_orders(org_id)
 
+    def preview(self, org_id: str, offer_id: str, selected: list[SelectedLine]) -> dict:
+        """Dry run of step 4: what would the mandate decide? Nothing is reserved, ordered or logged."""
+        offer = self._store.get_offer(org_id, offer_id)
+        if offer is None:
+            raise NotFound(f"offer {offer_id}")
+        if not offer.signature or not self._signer.verify(offer_payload(offer), offer.signature):
+            raise InvalidOfferSignature(offer_id)
+        candidates = self._resolve(offer, selected)
+        now = self._clock.now()
+        mandate = self._mandates.get(org_id)
+        window = mandate.period_window if mandate else timedelta(days=7)
+        committed = sum((o.total_net for o in self._store.org_orders_since(org_id, now - window, COMMITTED_STATES)),
+                        Decimal("0"))
+        last_hour = len(self._store.org_orders_since(org_id, now - timedelta(hours=1), COMMITTED_STATES))
+        decision = self._policy.decide(build_decision_context(candidates, mandate, now, committed, last_hour))
+        return {"outcome": decision.outcome, "rules_fired": decision.rules_fired,
+                "total_net": str(sum((c.line_total_net for c in candidates), Decimal("0")))}
+
     def _replay(self, existing: Order, offer_id: str, selected: list[SelectedLine]) -> Order:
         if existing.offer_id != offer_id or existing.selected != selected:
             raise IdempotencyMismatch("same Idempotency-Key, different body")

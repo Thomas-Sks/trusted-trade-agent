@@ -3,15 +3,14 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import re
 from decimal import Decimal
 from pathlib import Path
 
 import pycountry
 
 from ttap.domain.models import CatalogProduct
+from ttap.domain.text import tokens
 
-_TOKEN_RE = re.compile(r"[a-zåäöéü0-9]+")
 _CLASSIFICATION_GROUPS = {"allergen", "nonAllergen", "nutritionalClaim", "packagingMarkedLabel"}
 
 
@@ -61,7 +60,7 @@ def parse_product(raw: dict) -> CatalogProduct:
 
 
 def _tokens(text: str) -> set[str]:
-    return {t for t in _TOKEN_RE.findall(text.lower()) if len(t) >= 3}
+    return tokens(text)
 
 
 class JsonCatalog:

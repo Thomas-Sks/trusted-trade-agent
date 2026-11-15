@@ -11,6 +11,7 @@ from ttap.domain.models import CatalogProduct, Offer, RequestLine
 from ttap.domain.explain import explain_offer
 from ttap.domain.offer import offer_hash, offer_payload, offer_valid_until
 from ttap.domain.ranking import build_offer_line
+from ttap.domain.text import tokens
 from ttap.ports import CatalogRepository, Clock, Signer, Store, SupplierGateway
 
 
@@ -36,6 +37,12 @@ class LookupService:
             subs = [self._catalog.get(s) for s in requested.substitutes]
             return [requested, *[p for p in subs if p is not None]], requested
         matches = [p for p in self._catalog.search(line.need.text, limit=100_000) if need_violation(p, line.need) is None]
+        # Relevance: if some products match every word of the need, partial matches are not equivalent products.
+        wanted = tokens(line.need.text)
+        overlap = {p.product_id: len(wanted & tokens(" ".join(p.names.values()))) for p in matches}
+        best = max(overlap.values(), default=0)
+        if best == len(wanted):
+            matches = [p for p in matches if overlap[p.product_id] == best or p.product_id in usual]
         matches.sort(key=lambda p: p.product_id not in usual)  # stable: keeps search relevance within each group
         return matches[: self._limit], None
 

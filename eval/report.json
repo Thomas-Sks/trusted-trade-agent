@@ -1,0 +1,140 @@
+{
+ "metrics": {
+  "cases": 16,
+  "first_time_right_pct": 100.0,
+  "decision_accuracy_pct": 100.0,
+  "touchless_pct": 100.0,
+  "pass^3_pct": 100.0,
+  "hard_constraint_violations": 0
+ },
+ "cases": [
+  {
+   "id": "milk-lf-1000",
+   "consistent": true,
+   "product": "Valio Hyv\u00e4 suomalainen Arki\u00ae Eila\u00ae semi skimmed milk drink 1 l lactose free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "milk-lf-3000",
+   "consistent": true,
+   "product": "Valio Hyv\u00e4 suomalainen Arki\u00ae Eila\u00ae semi skimmed milk drink 1 l lactose free",
+   "first_time_right": true,
+   "outcome": "PENDING_HUMAN",
+   "decision_ok": true
+  },
+  {
+   "id": "milk-lf-200",
+   "consistent": true,
+   "product": "Valio Hyv\u00e4 suomalainen Arki\u00ae Eila\u00ae semi skimmed milk drink 1 l lactose free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "oat-drink-vegan",
+   "consistent": true,
+   "product": "Oddlygood\u00ae oat drink 1l UHT gluten free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "cream-lf",
+   "consistent": true,
+   "product": "Valio cooking cream alternative 15 % 1 l lactose free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "yoghurt-lf",
+   "consistent": true,
+   "product": "Valio A+\u2122 natural yoghurt 1 kg lactose free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "rapeseed-oil",
+   "consistent": true,
+   "product": "FRYLIX 10L RAPESEED OIL",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "orange-juice",
+   "consistent": true,
+   "product": "12 x Vip orange juice 1l",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "butter-20kg",
+   "consistent": true,
+   "product": "Valio Eila\u00ae butter for laminating 4x5 kg unsalted lactose free",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "gf-pasta",
+   "consistent": true,
+   "product": "SamMills Pasta D'oro 500g Penne naturally glutenfree pasta",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "organic-coffee",
+   "consistent": true,
+   "product": "Paulig Mundo Original organic medium coarse ground coffee 18x300g",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "tofu-vegan",
+   "consistent": true,
+   "product": "Jalotofu Natural tofu 1080g Organic",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "tomato-usual-partial",
+   "consistent": true,
+   "product": "CHERRYTOMATOES 4KG LOOSE ES/MA/FR/NL",
+   "first_time_right": true,
+   "outcome": "PENDING_HUMAN",
+   "decision_ok": true
+  },
+  {
+   "id": "tomato-usual-nosub",
+   "consistent": true,
+   "product": "CHERRYTOMATOES 4KG LOOSE ES/MA/FR/NL",
+   "first_time_right": true,
+   "outcome": "PENDING_HUMAN",
+   "decision_ok": true
+  },
+  {
+   "id": "tomato-usual-small",
+   "consistent": true,
+   "product": "CHERRYTOMATOES 4KG LOOSE ES/MA/FR/NL",
+   "first_time_right": true,
+   "outcome": "AUTO_APPROVED",
+   "decision_ok": true
+  },
+  {
+   "id": "impossible",
+   "consistent": true,
+   "first_time_right": true,
+   "decision_ok": true,
+   "product": null,
+   "outcome": null
+  }
+ ]
+}

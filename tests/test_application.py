@@ -88,3 +88,21 @@ async def test_search_applies_hard_constraints_before_truncation_and_usual_produ
                               Delivery(requested_date=MONDAY, latest_acceptable_date=MONDAY))
     offer = await svc.lookup("org_a", req.request_id)
     assert offer.lines[0].tiers["good"].product_id == "ZZZ"
+
+
+async def test_full_word_matches_beat_cheaper_partial_matches():
+    from ttap.adapters.outbound.catalog_json import JsonCatalog
+    from ttap.application.lookup import LookupService
+    from ttap.domain.models import Delivery, Need, Quantity, RequestLine, Unit
+    from tests.factories import MONDAY, price, product, stock
+    from tests.fakes import FakeGateway
+    env = Env()
+    juice = product("J", "Orange juice 1 l")
+    mixed = product("X", "Mixed juice drink 1 l")         # cheaper, but only matches 'juice'
+    gw = FakeGateway({"J": price("J", "2.00", "2.00"), "X": price("X", "1.00", "1.00")},
+                     {"J": stock("J", "9999999999"), "X": stock("X", "9999999999")})
+    svc = LookupService(JsonCatalog([juice, mixed], "v"), gw, env.signer, env.clock, env.store, env.new_id, env.auditor)
+    req = env.requests.create("org_a", [RequestLine(line_id="L1", need=Need(text="orange juice"),
+                              quantity=Quantity(value=Decimal("10"), unit=Unit.L))],
+                              Delivery(requested_date=MONDAY, latest_acceptable_date=MONDAY))
+    assert (await svc.lookup("org_a", req.request_id)).lines[0].tiers["good"].product_id == "J"
